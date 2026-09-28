@@ -7,12 +7,12 @@
 
 | 输入 | 体量 | 说明 |
 |---|---|---|
-| `D:\codex-ref\codex-app.css` | 627 KB | 应用主样式（Tailwind 产物 + Monaco/vscode 令牌） |
-| `D:\codex-ref\codex-app-initial.css` | 100 KB | **语义层**：203 个 `_Name_hash_N` 形式的 CSS-Modules 类 |
-| `D:\codex-ref\codex-app-initial.js` | 14.8 MB | 命令注册表与 DOM 契约（`codex.command.*` 只在这里出现） |
-| `D:\codex-ref\codex-register.js` | 5.1 MB | 注册表引导；`codex.*` 键 0 个（命名空间不在这里） |
-| `D:\codex-ref\codex-model-picker.css` / `codex-composer.css` / `codex-theme-generated.css` | 12/46/93 KB | 模型选择器、composer、生成的主题令牌 |
-| `D:\codex-src-tmp`（`openai/codex`） | 4925 `.rs` + 1429 `.snap` | Rust CLI/TUI；**不含**桌面界面，桌面界面只在 asar 里 |
+| `<codex-ref>/codex-app.css` | 627 KB | 应用主样式（Tailwind 产物 + Monaco/vscode 令牌） |
+| `<codex-ref>/codex-app-initial.css` | 100 KB | **语义层**：203 个 `_Name_hash_N` 形式的 CSS-Modules 类 |
+| `<codex-ref>/codex-app-initial.js` | 14.8 MB | 命令注册表与 DOM 契约（`codex.command.*` 只在这里出现） |
+| `<codex-ref>/codex-register.js` | 5.1 MB | 注册表引导；`codex.*` 键 0 个（命名空间不在这里） |
+| `<codex-ref>/codex-model-picker.css` / `codex-composer.css` / `codex-theme-generated.css` | 12/46/93 KB | 模型选择器、composer、生成的主题令牌 |
+| `<openai-codex 克隆>`（`openai/codex`） | 4925 `.rs` + 1429 `.snap` | Rust CLI/TUI；**不含**桌面界面，桌面界面只在 asar 里 |
 
 **判据（怎么分「界面层」与「需要宿主能力」）**
 

@@ -87,6 +87,20 @@ body {
   --dsw-codex-hover-fill: #f2f2f3;
   /* 焦点环：Codex --color-border-focus = --blue-300 = #339cff（亮色直接取色） */
   --dsw-codex-focus: #339cff;
+  /* 宿主的焦点环令牌接到 Codex 焦点色上。宿主 ui-theme 的 :focus-visible 与 10 条用
+     box-shadow 画环的组件规则都读 var(--dsw-focus-ring-color, 墨色回落)，而宿主从不在根上
+     声明它 —— 不接的话那 10 处聚焦时是墨色内环。宿主在指针操作时会把它就地置成 transparent
+     （html[data-input-modality=pointer] … :focus-visible），本皮肤的环也读这个令牌，
+     所以同一条「鼠标点击不出环」的宿主约定对皮肤一样生效。
+     var() 在声明它的元素上解析：body 上读到的是 body 自己的 --dsw-codex-focus，
+     深色那一档（70%）因此不需要再写一遍。 */
+  --dsw-focus-ring-color: var(--dsw-codex-focus);
+  /* Codex 的两条中性描边（app.asar 令牌，CHANGELOG 0.5.9 / 0.5.10 取证）：
+       --color-border        = --alpha-10（亮）/ --alpha-12（暗）
+       --color-border-strong = 15%（亮）/ 20%（暗）
+     输入卡环与功率轨描边用前者，功率轨拇指用后者。 */
+  --dsw-codex-border: rgba(13, 13, 13, 0.1);
+  --dsw-codex-border-strong: rgba(13, 13, 13, 0.15);
   --dsw-alias-interactive-bg-active: rgba(13, 13, 13, 0.08);
   --dsw-alias-interactive-bg-hover-solid: #f1f1ef;
   --dsw-alias-interactive-bg-hover-accent: rgba(13, 13, 13, 0.06);
@@ -249,6 +263,8 @@ body[data-ds-dark-theme] {
   --dsw-codex-hover-fill: rgba(255, 255, 255, 0.08);
   /* 焦点环：Codex 深色 --color-border-focus = --blue-300 70%，即 #339cffb3。 */
   --dsw-codex-focus: rgba(51, 156, 255, 0.7);
+  --dsw-codex-border: rgba(255, 255, 255, 0.12);
+  --dsw-codex-border-strong: rgba(255, 255, 255, 0.2);
   --dsw-alias-interactive-bg-active: rgba(255, 255, 255, 0.1);
   --dsw-alias-interactive-bg-hover-solid: #282828;
   --dsw-alias-interactive-bg-hover-accent: rgba(255, 255, 255, 0.08);
@@ -391,6 +407,14 @@ body {
   --dsw-leading-xl: 1.35;
   --dsw-leading-2xl: 1.25;
 
+  /* 字体栈（原样照抄宿主 dsh-client-ui-theme 的 base_css_default，0.1.7-rc.2 逐字比对一致）。
+     本皮肤自己声明一次，外观就不随宿主版本漂：UI 栈系统字体优先 + 中文回退链，
+     代码栈等宽优先 + 中文回退，两条都保留中文回退。设置页 fontUi / fontCode 覆盖的就是这两个令牌。 */
+  --dsw-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ds-font-family-code: "SF Mono", "JetBrains Mono", "Fira Code", Consolas,
+    "Liberation Mono", Menlo, Courier, "PingFang SC", "Microsoft YaHei";
+
   /* 元信息 mono 规约：等宽 + 大写 + 加宽字距（Codex TUI 血统） */
   --dsw-font-meta: var(--ds-font-family-code);
   --dsw-meta-size: 11px;
@@ -432,7 +456,10 @@ body {
 body,
 body * {
   --dsw-elevation-stroke-color: rgba(13, 13, 13, 0.08);
-  --dsw-elevation-stroke: 0 0 0 0.5px rgba(13, 13, 13, 0.08);
+  /* 描边几何引用颜色令牌，而不是把同一个 rgba 再抄一遍：颜色只有上一行这一个真源，
+     亮暗两套各改一处即可（Codex 原文 --elevation-stroke 同样是「几何 + 颜色令牌」）。
+     同一元素上声明、同一元素上解析，所以 body * 上逐元素都取到本元素的颜色。 */
+  --dsw-elevation-stroke: 0 0 0 0.5px var(--dsw-elevation-stroke-color);
   --dsw-elevation-panel: var(--dsw-elevation-stroke);
   /* Codex --elevation-prominent 逐字（app.asar @67930856）：
        var(--elevation-stroke), 0 3px 7.5px #0000000a, 0 0 20px #0000000d
@@ -440,21 +467,22 @@ body * {
      这个令牌是**宿主菜单与面板**的主阴影（.QsffPG_menu / ._7KE1Ra_menu / .JObwrW_panel
      等 14 处消费），不是边角料。 */
   --dsw-elevation-prominent: var(--dsw-elevation-stroke), 0 3px 7.5px #0000000a, 0 0 20px #0000000d;
-  /* --dsw-elevation-soft 在 Codex 里**没有同名令牌**（Codex 只有 stroke / stroke-subtle /
-     prominent / sidebar / composer / composer-dark）。这是本皮肤自造的一档，保留待验。 */
-  --dsw-elevation-soft: var(--dsw-elevation-stroke), 0 8px 28px rgba(13, 13, 13, 0.1);
+  /* --dsw-elevation-soft **不覆盖**，交还宿主自己的值（stroke + 0 4px 16px #00000008 + 0 0 24px #00000008）。
+     Codex 没有同名令牌（只有 stroke / stroke-subtle / prominent / sidebar / composer / composer-dark），
+     0.5.10 及以前这里写的 0 8px 28px 10% 墨（暗色 55% 黑）既无截图读数也无源码锚点，
+     却落在宿主 SegmentedControl 的选中片上 —— 设置页每个分段控件都背着一团自造的大影。
+     宿主值里的第一层仍是 var(--dsw-elevation-stroke)，所以描边照样跟本皮肤走。 */
 }
 
 body[data-ds-dark-theme],
 body[data-ds-dark-theme] * {
   --dsw-elevation-stroke-color: rgba(255, 255, 255, 0.09);
-  --dsw-elevation-stroke: 0 0 0 0.5px rgba(255, 255, 255, 0.09);
+  --dsw-elevation-stroke: 0 0 0 0.5px var(--dsw-elevation-stroke-color);
   --dsw-elevation-panel: var(--dsw-elevation-stroke);
   /* 这里**不再覆盖** --dsw-elevation-prominent**：Codex 只在 :root 声明一次、没有暗色变体，
      所以暗色沿用同一份字面值。后果是暗色菜单不再有 50% 黑的大外影，只剩发丝线 + 填充 ——
      与 Codex 暗色的整体做法一致（0.5.7 已证输入卡暗色无外影，0.5.8 已证暗色靠填充分层）。
      原先的 0 4px 16px rgba(0,0,0,.5) 无任何取证。 */
-  --dsw-elevation-soft: var(--dsw-elevation-stroke), 0 8px 28px rgba(0, 0, 0, 0.55);
 }
 
 /* ── 排版层：标题字重 600 封顶 ───────────────────────────────────────────── */

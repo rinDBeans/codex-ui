@@ -2,6 +2,80 @@
 
 [English](CHANGELOG.md)
 
+## 0.6.0 - 2026-09-28
+
+模型选择器的 B 面（Codex 推理等级功率轨）落地；外加一轮对照复刻规格的全仓审查，修掉其中查实的问题。
+
+### ⑳ 模型选择器 B 面：自建组件顶替模型位
+
+- **做法是「DOM 顶替席位」，不寄生宿主菜单**（0.5.0 那条 CSS 重排的路卡顿、简陋，已 revert）。
+  自己的触发器追加进 `[data-slot="conversation.input.model"]`，弹层挂 `document.body`；席位里有我们的触发器时，
+  `model-picker.css` 用**一条**直接子代 `:has()` 把宿主那一格 `display:none`（仍在 React 树里）。不打标记属性 ——
+  React 换掉宿主子节点时标记会丢、宿主控件闪回；`:has()` 只看「我们在不在席」，摘掉触发器宿主立刻复原。
+- **数据与提交只走宿主**：`ctx.inject(['modelDirectories'], …)` 等服务（与宿主自己挂模型位同一个口子，服务缺席不阻塞皮肤），
+  `directoryFor(会话).store` 订阅，`select({ provider, model, reasoningEffort })` 提交。会话 id 取席位祖先的
+  `data-conversation-session`（右栏侧边聊天有自己的席位），取不到再退到 `uiSession`。宿主没渲染的席位（子代理会话）不接管。
+- **功率轨按 Codex 源码逐字**：轨 24px / 圆角 12 / 前景 10% / `inset .5px` 描边；档位点 4px、热区 16px，走过的 30% 白；
+  拇指 28px 白片 / `.5px` 强描边 / `0 0 2px` 微影；已选段强调色、止于拇指中线；主曲线 `.3s cubic-bezier(.23,1,.32,1)`，
+  拇指首帧 0s、16ms 后抬到 .3s。弹层宽 254px（`spacing × 63.5`），入场 `.32s … 30ms` 自 `scale(.98)`；
+  定位照宿主 `place()`（右沿对齐、上方 8px、视口留 12px）。
+- **交互**：真拖拽（按下抓取 → 自由滑动、**不提交** → 松手对齐最近档提交一次），`touch-action: none`；←/→/Home/End；
+  键盘焦点把 2px 环画在拇指上；Escape 关闭并还焦点（鼠标打开后焦点在触发器上时也能关）；换模型连带该模型的默认档提交，成功后关弹层。
+  档位数与名字全部来自 `reasoning.efforts`。
+- **往返期间**（宿主在整个 selectModel 往返里把目录标成 selecting）：列表签名里没有 status，卡片不重画、不清空；
+  轨与触发器按 pending 那一档乐观显示，档位名旁转圈（换模型时是那一行行尾转圈）。失败时弹层顶上给宿主同款提示
+  （会话被占用单独一句），轨退回生效档。
+- 触发器档位文字照 Codex `_ModelPickerTriggerEffortText`：各档名叠在同一格、模糊交叉淡入，宽度不跳。
+- 文案先借宿主 `model` 命名空间（与原生菜单逐字一致，内置模型的说明也跟着本地化），宿主字典缺席才用自带表。
+- 设置卡新增一行「Codex 模型选择器」（`modelPicker`，**默认开**）。关掉即撤走全部自建节点，宿主原生菜单（⑫ A 面）立刻复原；
+  设置文档还没到时不先接管，免得开了又撤闪一下。**Config 因此是 12 个字段**（复刻规格写的是 11 个 + 主题偏好）。
+- **没做**：Codex 功率轨的三个进阶态（高亮、Fast 圆点飞出、超出最大档的紫蓝渐变）—— DSH 没有 Fast 模式也没有那一态；
+  触发器上 Max 档的紫色不做，它在彩色白名单之外。
+- 注：606faea 曾以同名 0.6.0 提交过一次，但只提交了生成物 `client.js`，组件与样式源文件、构建改动、体检与探针都没进仓库，
+  随即 revert。本版是完整重做，源码、构建与验收一起入库。
+
+### 审查修正
+
+- **输入卡阴影双真源**：`patches.css` ⑧ 还写着 `[data-composer-card] { box-shadow: var(--dsw-elevation-panel) }`，
+  与 `composer.css` ⑭ 的 Codex 三层阴影是同一元素的两个真源（谁生效只看权重）。宿主只在会话滚动区里渲染这张卡，已删。
+- **`--dsw-elevation-soft` 不再自造**：0.5.10 的 `0 8px 28px 10% 墨`（暗色 55% 黑）既无读数也无锚点，却落在宿主
+  `SegmentedControl` 的选中片上（设置页每个分段控件都背着它）。交还宿主自己的值。
+- `--dsw-elevation-stroke` 改为 `0 0 0 .5px var(--dsw-elevation-stroke-color)`（规格原文；计算值不变）。
+- **字体栈**在 `skin.css` 逐字声明一次（与宿主 0.1.7-rc.2 的 base_css_default 逐字比对一致），外观不随宿主版本漂。
+- **焦点环接到宿主令牌上**：声明 `--dsw-focus-ring-color: var(--dsw-codex-focus)`。宿主 10 条用 box-shadow 画环的组件规则
+  此前落回墨色回落值，现在是 Codex 蓝；皮肤自己的环也改读它，于是继承宿主「指针操作不出环」的约定
+  （`html[data-input-modality=pointer]` 时宿主把它就地置成 transparent）。
+- 新增 `--dsw-codex-border`（10% / 12%）与 `--dsw-codex-border-strong`（15% / 20%），即 Codex 的 `--color-border` / `--color-border-strong`。
+- **设置卡深色背景的默认值错了**：`SKIN_DEFAULTS.dark.surface` 停在 `#181818`，而 0.5.6 起深色窗口背景是 `#111111`
+  —— 背景色块显示的「跟随皮肤」值与实际不符。已改，`check-repo` 新增逐字段对账 skin.css，漂移即 FAIL。
+- `.cx-error` 读的是不存在的 `--dsw-alias-state-error`，「保存没生效」的提示一直是普通文字色；改读 `error-primary`。
+- **字体栈校验加固**：`isFontStack` 另挡反斜杠（`u\72l(` 在分词器眼里就是 `url(`）、注释起止（值里开一个注释会把深色覆盖整块吞掉）、
+  控制字符与不成对的引号。`check-repo` 对「吞掉深色块」直接断言产物。
+- **安装器在新 profile 上写坏 YAML**：dsh rc.2 新建 profile 的 `cordis.patch.yml` 是流式空列表 `[]`，安装器直接在后面接
+  `- insert:`，`dsh web` 启动即抛 `failed to parse overlay`。现在空 `[]` 先摘掉，非空流式列表拒绝并提示。
+- **产物里带着本机路径**：`composer.css` 注释里的本地克隆路径被原样拼进 `theme.css` 与 `client.js` 发出去，而体检只扫 JS、
+  且认不出 JSON 转义后的双反斜杠。体检扩到样式与文档并认两种写法；`docs/` 里的本机路径换成占位符。
+- 过期注释：卡片圆角 10px → 12px、「链接 = 墨」→ 强调色、过渡 100ms → 150ms、输入区 14px → 16px、⑫ 行圆角 8 → 13、
+  各层头部的 `install-plugin.mjs` → `src/build.mjs`、`build.mjs` 的「五份样式」、皮肤 README 的文件表与「链接是墨色」。
+
+### 验收
+
+- **新增** `scripts/power-rail-verify.mjs`（47 项，只要 Chromium）：真实组件 + 真实 theme.css + 按宿主契约写的假目录，
+  `select()` 往返故意放慢到 600ms —— 本机真宿主往返不到 60ms，pending 行为在真 GUI 上来不及量。它量出并修掉了两个问题：
+  宿主字典缺席时内置模型说明画出了字典键名；鼠标打开后焦点在触发器上时 Escape 关不掉。
+- **新增** `scripts/pack-host-asar.mjs`：没有桌面壳时，把 npm 装的宿主包拼成夹具能读的 `app.asar`（与桌面壳同一批包）。
+- `hero-verify.mjs`：「徽标圆角保持官方 6px」写死的是 rc.1 的字面量；rc.2 改成了 `var(--dsw-radius-xs)`（宿主给 4px），
+  在 rc.2 上必然 FAIL。期望值改为从宿主源码现取。
+- `live-gui-probe.mjs`：新 profile 一进来是两层引导弹层，探针的点击全落在遮罩上 —— 右栏三条断言「实测 none」就是这么来的，
+  现在先关弹层。模型位按 B 面量 7 条（顶替、几何、键盘改档写进宿主 store 并改回）；B 面关着时量 A 面 pending，
+  `--latency`（默认 800ms）给那一次往返加时延，否则窗口在第一次采样前就结束了。探针改完档位会改回去。
+- `settings-page-verify.mjs`：9 行；深色底色断言仍是 0.5.6 之前的 `#181818`，改为 `#111111`；新增开关 5 条
+  （关掉后刷新、席位里没有自建触发器、宿主那一格可见，收工复位）。
+- 全套（npm `@deepseek-ai/dsh@0.1.7-rc.2` + 由它打包的 asar + Edge/Chromium 153；真 GUI 为同版本 `dsh web`）：
+  `check-repo` 23/23 · `audit` 36/36 · `elevation` 19/19 · `composer-shadow` 23/23 · `model-picker` 20 · `power-rail` 47/47 ·
+  `rightbar` 42 · `hero` 25 · `sidebar-align` 6/6 · `sidebar-surface` 13/13 · 真 GUI `live-gui-probe` B 面 14/14、A 面 10/10 ·
+  `settings-page-verify` 29/29 · `theme-flash-probe` 9 段 0 异常帧（点击→变色中位 23ms）。
+
 ## 0.5.10 - 2026-09-28
 
 第三张 Codex 截图让输入卡环的取值**不再依赖设备像素比**就能定下来 —— 也顺带查出 0.5.8 的 12% 偏重。

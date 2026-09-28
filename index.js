@@ -55,6 +55,9 @@ export const Config = Schema.object({
   fontUi: Schema.string().default('').volatile(),
   fontCode: Schema.string().default('').volatile(),
   translucentSidebar: Schema.boolean().default(false).volatile(),
+  /* 默认开：装上即由自建组件接管 composer 的模型位（模型列表 + 推理等级功率轨）。
+     关掉即撤走全部自建节点，宿主原生的模型菜单立刻复原（皮肤给它的 A 面样式照常）。 */
+  modelPicker: Schema.boolean().default(true).volatile(),
   contrastLight: Schema.number().default(DEFAULT_CONTRAST_LIGHT).volatile(),
   contrastDark: Schema.number().default(DEFAULT_CONTRAST_DARK).volatile(),
 });

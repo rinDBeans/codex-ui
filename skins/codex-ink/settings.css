@@ -92,7 +92,7 @@
 }
 
 .cx-hex:focus-visible {
-  outline: 2px solid var(--dsw-codex-focus);
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: 1px;
 }
 
@@ -108,7 +108,7 @@
 }
 
 .cx-text:focus-visible {
-  outline: 2px solid var(--dsw-codex-focus);
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: 1px;
 }
 
@@ -134,7 +134,9 @@
 
 .cx-error {
   margin: 8px 0 0;
-  color: var(--dsw-alias-state-error, var(--dsw-alias-label-primary));
+  /* 旧值读的是 --dsw-alias-state-error —— 这个令牌宿主与本皮肤都没有，于是永远落到回退的
+     主文本色，「保存没生效」的提示看起来跟普通说明一样。改读真实存在的 error-primary。 */
+  color: var(--dsw-alias-state-error-primary);
   font-size: 11px;
   line-height: 16px;
 }

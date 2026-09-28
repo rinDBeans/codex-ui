@@ -6,7 +6,7 @@
 
   # codex-ui
 
-  **Codex appearance for DSH Web: window edges, sidebar divider, model menu, composer, theme colors**
+  **Codex appearance for DSH Web: window edges, sidebar divider, model picker and reasoning power rail, composer, theme colors**
 
   [简体中文](README.zh-CN.md) · [Changelog](CHANGELOG.md) · [MIT](LICENSE)
 
@@ -26,14 +26,16 @@ images are in the sections below and in `assets/reference/`.
 
 ## Host compatibility
 
-Developed against DSH `0.1.7-rc.1` (npm global install) and `0.1.7-rc.2` (Windows desktop shell `app.asar`).
+Developed against DSH `0.1.7-rc.1` (npm global install) and `0.1.7-rc.2` (Windows desktop shell `app.asar`);
+the full 0.6.0 verification ran on the npm release `@deepseek-ai/dsh@0.1.7-rc.2` (a real `dsh web` instance plus an asar packed from it, see "Host paths").
 The verification scripts read shipped CSS straight out of `app.asar`; a host upgrade that changes structure fails their assertions.
 
 ## Features
 
 | Id | Content |
 |---|---|
-| ⑫ | Model picker: native trigger, opaque white menu (18px radius), 28px rows with 13px radius (concentric: 18 − 5px inset), permanent check column, pending spinner |
+| ⑳ | **Model picker, face B** (on by default): a component of our own takes over the composer model seat — model list (grouped by provider, with descriptions) plus the Codex reasoning **power rail** (24px track / 4px ticks / 28px white thumb, real drag, ←/→/Home/End, levels from the data); during the round trip it shows the new level optimistically with a spinner and never clears the list; the trigger cross-fades the effort label with blur. Can be switched off in settings |
+| ⑫ | Model picker, face A (the host menu when ⑳ is off): opaque white menu (18px radius), 28px rows with 13px radius (concentric: 18 − 5px inset), permanent check column, pending spinner |
 | ⑬ | Composer header turned blank, panel buttons keep the official icons |
 | ⑬c | Both header slots **released**: entries registered there render again (subagent descendant count / job roster / preset badge / open-in-app); the view tabs stay hidden. The entries are conditionally rendered, so the top bar is unchanged in the common case |
 | ⑭ | Composer card: radius (card 20/25, top strip = the card's own radius), shadow, geometry, tool row, hero layout |
@@ -43,7 +45,7 @@ The verification scripts read shipped CSS straight out of `app.asar`; a host upg
 | ②c | Conversation window edge: 0.5px hairline plus a 24px ambient shadow |
 | ②d | Right panel: hairline only on its left edge, shadow bleeds upward only; the dockkit 1px border is removed |
 | ②e | Right divider handle: center-darkest gradient on hover |
-| ⑱ | Settings card on the plugin manager's codex-ui bundle page: theme / accent / background / foreground / UI font / code font / translucent sidebar / contrast |
+| ⑱ | Settings card on the plugin manager's codex-ui bundle page: theme / accent / background / foreground / UI font / code font / translucent sidebar / Codex model picker / contrast |
 
 ## Screenshots
 
@@ -55,7 +57,11 @@ Composer bottom row: no box by default, a chip on hover.
 
 ![Composer controls](assets/screenshots/composer-controls-hover.png)
 
-Model menu while a reasoning effort is being written.
+Model picker face B (captured on a real `dsh web` instance): model list plus reasoning power rail, light and dark.
+
+<p><img src="assets/screenshots/model-picker-live.png" alt="Model picker · light" width="49%"> <img src="assets/screenshots/model-picker-live-dark.png" alt="Model picker · dark" width="49%"></p>
+
+With face B switched off, the host menu (face A) while a reasoning effort is being written.
 
 ![Model menu pending](assets/screenshots/model-pending.png)
 
@@ -71,8 +77,8 @@ node scripts/install-plugin.mjs --bundle --write              # register through
 node scripts/build.mjs --check                               # report stale artifacts without writing
 ```
 
-The installer scopes the six stylesheets in `skins/codex-ink/` to `html[data-codex-ui]`, combines them with
-`src/client.template.js` (which inlines `src/override.js` and `src/settings-card.js`) into `client.js`, copies the
+The installer scopes the eight stylesheets in `skins/codex-ink/` to `html[data-codex-ui]`, combines them with
+`src/client.template.js` (which inlines `src/override.js`, `src/model-picker.js` and `src/settings-card.js`) into `client.js`, copies the
 result to `profiles/<name>/vendor/codex-ui`, creates the `node_modules/codex-ui` junction, and keeps exactly one
 registration path.
 
@@ -98,13 +104,15 @@ node scripts/install-skin.mjs --write  # overwrite on drift
 | `src/client.template.js` | Browser half template (stylesheet, override layer, settings seat) |
 | `src/override.js` | Override-layer pure functions (no DOM; unit-tested by the repo checks) |
 | `src/settings-card.js` | The config card on the bundle page (inlined into `client.js` at build time) |
+| `src/model-picker.js` | Model picker face B: seat takeover, popover, power rail (its pure functions are unit-tested by `check-repo`) |
 | `src/build.mjs` | Scoping and artifact generation; the only implementation |
 | `theme.css` `client.js` | Generated from `skins/codex-ink/` by `src/build.mjs` |
-| `skins/codex-ink/` | Stylesheet sources (skin.css / patches.css / sidebar-align.css / sidebar-surface.css / window-shadow.css / composer.css / settings.css) |
+| `skins/codex-ink/` | Stylesheet sources (skin.css / patches.css / model-picker.css / sidebar-align.css / sidebar-surface.css / window-shadow.css / composer.css / settings.css) |
 | `docs/` | Plans and decisions |
 | `scripts/build.mjs` | Regenerate the artifacts; `--check` compares without writing |
 | `scripts/check-repo.mjs` | Host-free repository checks; the CI entry point |
 | `scripts/host-paths.mjs` | Resolves `app.asar`, the global `@deepseek-ai` modules and Chromium |
+| `scripts/pack-host-asar.mjs` | Without a desktop shell, packs npm-installed host packages into an `app.asar` the fixtures can read |
 | `scripts/install-plugin.mjs` `scripts/install-skin.mjs` | Installers |
 | `scripts/*-verify.mjs` `scripts/live-gui-probe.mjs` `scripts/settings-page-verify.mjs` | Fixture verification and live probing |
 | `scripts/make-verify-profile.mjs` | Builds a throwaway verification profile: plugin manager enabled, only this plugin, no existing profile touched |
@@ -118,15 +126,16 @@ node scripts/install-skin.mjs --write  # overwrite on drift
 |---|---|---|
 | `npm run check` | Syntax, JSON, manifest, artifact sync, encoding, docs pairing, machine-specific paths | none |
 | `node scripts/audit-codex-ink.mjs` | Skin structure, 36 WCAG pairs, color whitelist | none |
-| `node scripts/model-picker-verify.mjs` | ⑫ and the pending indicator, 20 assertions | none |
+| `node scripts/model-picker-verify.mjs` | ⑫ (face A, the host menu) and the pending indicator, 20 assertions | none |
+| `node scripts/power-rail-verify.mjs` | ⑳ face B: seat takeover and hand-back, trigger and popover geometry, Codex power rail geometry verbatim, no commit while dragging / one snapped commit on release, no snap-back and no list reset during a slow (600ms) round trip with a spinner, the four keys, focus ring, Escape, model change carrying its default effort, failure notice, reduced motion, dark, the switch — 47 assertions | none (Chromium only) |
 | `node scripts/rightbar-verify.mjs` | Shadow layer, right panel, both dividers, 42 assertions | none |
 | `node scripts/sidebar-align-verify.mjs` | Sidebar column alignment, 6 assertions | none |
 | `node scripts/sidebar-surface-verify.mjs` | Sidebar scroll fade (the Codex mask ramp): mechanism plus pixels, four states side by side, 13 assertions | none |
 | `node scripts/hero-verify.mjs` | ⑬ ⑭ ⑰, the focus ring and the released header slots, 25 assertions | none |
 | `node scripts/composer-shadow-verify.mjs` | ⑱ Composer shadow aligned to Codex's `--elevation-composer`: per-layer geometry and alpha in light, the dark inset with zero outside shadow, the narrow-viewport 80→40px branch, plus rendered pixels (falloff radius, inside top edge) and one precondition self-check — 23 assertions | none |
 | `node scripts/elevation-verify.mjs` | ⑲ The `--dsw-elevation-*` tokens against Codex's source: per-layer geometry and alpha, layer 1 tracking the stroke, layers 2–3 identical across themes (Codex declares no dark variant), and a rendered menu panel — 19 assertions | none |
-| `node scripts/live-gui-probe.mjs --url <token URL>` | Real GUI: 10 assertions on shadows, both dividers, the model menu pending window | a running `dsh web` |
-| `node scripts/settings-page-verify.mjs --url <token URL>` | Real GUI: the card on the bundle page, its 8 rows, no override at defaults, switch and accent writes, survival across a reload — 22 assertions | a running `dsh web` with the plugin manager enabled |
+| `node scripts/live-gui-probe.mjs --url <token URL>` | Real GUI: 7 assertions on shadows and both dividers, plus the model seat — 7 on face B when it is on (takeover, geometry, a keyboard change written into the host store and reverted), or 3 on the face A pending window when it is off (`--latency` adds 800ms to that round trip by default; locally it takes <60ms and the window cannot be sampled) | a running `dsh web` |
+| `node scripts/settings-page-verify.mjs --url <token URL>` | Real GUI: the card on the bundle page, its 9 rows, no override at defaults, switch and accent writes, the host seat coming back when the model picker is off, survival across a reload — 29 assertions | a running `dsh web` with the plugin manager enabled |
 | `node scripts/theme-flash-probe.mjs --url <token URL>` | Per-frame sampling of the effective backdrop during theme and page switches (first opaque ancestor background); reports frames belonging to neither end of the transition (measured: 9 windows, ~720 frames, 0 anomalies) | same as above |
 
 `npm run check` needs no host. The fixture suites run locally: they need shipped CSS from `app.asar` plus a DOM
@@ -141,7 +150,19 @@ The verification scripts read the host they run against. Each path is resolved i
 2. `scripts/host.local.json`, a gitignored per-machine file, for example `{ "asar": "D:/.../resources/app.asar" }`;
 3. a scan of the standard install locations, Playwright's browser cache and `npm root -g`.
 
-No machine-specific path is committed.
+No machine-specific path is committed (`npm run check` scans JS, stylesheets and docs, including the JSON-escaped form inside `client.js`).
+
+Without a desktop shell, pack the same packages from npm:
+
+```powershell
+npm install @deepseek-ai/dsh@0.1.7-rc.2 --prefix <tmp>
+node scripts/pack-host-asar.mjs --from <tmp>/node_modules --out <tmp>/app.asar
+$env:DSH_ASAR = "<tmp>/app.asar"; $env:DSH_GLOBAL_MODULES = "<tmp>/node_modules"
+$env:DSH_CHROME = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"   # system Edge when Playwright is not installed
+```
+
+The same npm package can also boot a real instance: `$env:DSH_HOME = "<tmp>/home"; node <tmp>/node_modules/@deepseek-ai/dsh/lib/bin.js web --port 3098 --no-open`
+(the first run creates the web profile; then run `install-plugin.mjs --profile web --write`).
 
 ```powershell
 dsh --profile web --port 3099 --no-open      # prints a token URL
@@ -173,6 +194,7 @@ dark default, 60):
 | UI font | `fontUi` | empty | `--dsw-font-family` |
 | Code font | `fontCode` | empty | `--ds-font-family-code` |
 | Translucent sidebar | `translucentSidebar` | off | sidebar fill and row fills become translucent |
+| Codex model picker | `modelPicker` | on | the ⑳ face B component takes over the model seat; off removes every node of ours and the host menu (⑫ face A) comes straight back |
 | Contrast | `contrastLight` / `contrastDark` | 45 / 60 | text tiers and the neutral alpha ladder |
 
 - **The theme row is not card-local view state**: it writes the host's `ui-theme` `preference`, the same setting as
@@ -189,10 +211,12 @@ dark default, 60):
   `color-scheme` on `html`), then handed back idempotently when `theme/change` arrives with the same result. If the
   confirmation does not arrive within 2.5s, the preview rolls back to the truth. Measured click → colour change:
   **824ms → 22ms** (median), with the run sequence still two runs (light×n → dark×m) and no double publish.
-- All 11 fields are `.volatile()`: the settings service only projects volatile fields, and that is exactly how the
+- All 12 fields are `.volatile()`: the settings service only projects volatile fields, and that is exactly how the
   plugin manager knows the entry — no `Config`, no card.
 - **Empty means no override**: at the defaults the override layer emits an empty string and `data-codex-ui-theme` never
-  appears, so an untouched install looks byte-for-byte like 0.1.x (a repo check asserts this).
+  appears, so an untouched install's style layer is byte-for-byte 0.1.x (a repo check asserts this). The model picker is a
+  structural component and does not go through the override layer: it is on by default and governed by the single
+  `modelPicker` switch; switched off, the seat and the host menu are handed back completely.
 - Overrides live in one runtime `<style>` whose selector carries one extra attribute (specificity +1), so sheet order
   does not matter and `skins/*.css` is never touched.
 - Instant write, no save button; text inputs commit on Enter or blur and every write is read back to confirm it landed;
@@ -202,12 +226,12 @@ dark default, 60):
   (clamped to 0.5×–2×). Colored state and diff fills are excluded so the palette never leaks into the override layer.
 - The translucent sidebar has no window layer to reveal on the web, and in dark the sidebar shares the surface colour,
   so it is invisible there — the switch therefore also turns the sidebar row fills translucent, otherwise it would be
+  completely silent in dark. Recorded as a gap, not presented as an equivalent.
 - The skin paints the canvas itself: `html` and `body` both carry this skin's base colour in either theme (`html` follows
   through `:has(body[data-ds-dark-theme])`, because the host stamps the theme marker on `body` only). Transitions are
   suppressed for the two frames after a theme change (`html[data-codex-ui-switching] *`, set by the browser half on
   `ctx.on('theme/change')`). Both prevent a flash: the first closes the "nobody painted the canvas this frame" hole that
   would reveal the host's default backdrop, the second stops the whole page from cross-fading.
-  completely silent in dark. Recorded as a gap, not presented as an equivalent.
 
 ## Measurements
 
@@ -270,12 +294,18 @@ Source: point samples from `assets/reference/codex-sidebar-reference.png`.
   recorded in the changelog.
 - Fixture checks are not signed-in screenshots. The `dsh web` launch token has a lifetime and lives in process memory only.
 - In headless mode only the foreground tab handles `:hover`, so multi-page fixtures open the web-shape page last.
-- A flat single list of model plus effort, and a per-model description column, need a client plugin that takes over the
-  `conversation.input.model` slot and reuses `ctx.modelDirectories`. Not implemented here.
+- Face B of the model seat (⑳) **registers no slot**: the host still renders `conversation.input.model`; the component
+  appends its own trigger to the same seat and hides the host's child with one direct-child `:has()`; data and commits go
+  through the host's `ctx.modelDirectories` only. The three advanced states of the Codex power rail — the highlight when
+  Fast is off, the Fast-mode tick fly-out, and the purple/blue gradient beyond the maximum level — are not built: DSH has
+  no Fast mode and no "beyond maximum" state. The purple Max label on the trigger (`--color-chart-purple`) is skipped too:
+  it is outside the color whitelist.
 - ⑯ keeps the host tab strip: hiding it also removes the fullscreen and collapse buttons.
 - The session row text column is 40px, 2px shorter than the workspace, new session and plugin rows, because the shipped
   `Rows.module.css` gives `.sessionRow .title` its own margin. Left as is.
-- `composer.css` and `patches.css` use 21 hash-class suffix anchors (`[class$=…]`, `[class*=…]`) where the host exposes no `data-*`.
+- `composer.css`, `patches.css` and `sidebar-surface.css` use hash-class suffix anchors (`[class$=…]`, `[class*=…]`) where the host
+  exposes no `data-*`; `node scripts/build.mjs` reports the counts on every run (0.6.0: composer 18 · patches 12 ·
+  sidebar-surface 2, comment mentions included). `model-picker.css` has none.
 
 ## Codex source alignment
 
@@ -292,6 +322,10 @@ The Codex desktop app carries its webview CSS inside `resources/app.asar` (`webv
 | Light foreground | `--color-text-foreground: #1a1c1f` | `--dsw-alias-label-primary` |
 | Chip fill | `--background-button-secondary-hover`, 8% of the foreground | light `#f2f2f3` (measured), dark `rgba(255,255,255,.08)` |
 | Composer chip radius | Fully rounded pill (per-pixel measurement of `codex-composer-chip-hover.png`: R = h/2 = 21px) | `--dsw-radius-pill` (declared explicitly since 0.5.0; before that it inherited the host's `--dsw-radius-sm` = 8px) |
+| Power rail | `_Track` 24px / radius 12 / 10% foreground / `inset 0 0 0 .5px var(--color-border)`; `_Tick` 4px with a 16px hit area; `_Thumb` 28px white disc / `.5px` `--color-border-strong` / `0 0 2px #0000001a` | `.codex-mp-track` / `-tick` / `-thumb`, same values; `--color-border` → `--dsw-codex-border` (10% / 12%), `--color-border-strong` → `--dsw-codex-border-strong` (15% / 20%) |
+| Power rail motion | `.3s cubic-bezier(.23, 1, .32, 1)`, tick transform `.12s`, thumb `0s` on the first frame and `.3s` after 16ms | same values (`--codex-mp-*`) |
+| Picker popover | width `calc(var(--spacing) * 63.5)` = 254px; enter `.32s cubic-bezier(.23,1,.32,1) 30ms`, `opacity 0 / scale(.98)` → 1 | same; placement follows the host `place()`: right-aligned, 8px above, 12px viewport margin |
+| Font stacks | — (the host `dsh-client-ui-theme` base_css_default) | declared verbatim once in `skin.css`, so the look does not drift with the host version |
 
 Deliberate differences:
 

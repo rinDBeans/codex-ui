@@ -28,10 +28,14 @@ export const SETTINGS_ENTRY_ID = 'codex-ui';
 /** Codex 默认对比度：亮 45 / 暗 60。 */
 export const DEFAULT_CONTRAST = { light: 45, dark: 60 };
 
-/** 皮肤默认值（空串即回落到这里）。 */
+/**
+ * 皮肤默认值（空串即回落到这里）。surface = 设置页「背景」那一行 = --dsw-alias-bg-base。
+ * 深色 surface 自 0.5.6 起是窗口背景 #111111（#181818 是表面/侧栏那一层）；这里曾停在 #181818，
+ * 设置卡的背景色块因此显示错的默认值。check-repo 现在逐字段对账 skin.css，漂移即 FAIL。
+ */
 export const SKIN_DEFAULTS = {
   light: { accent: '#339cff', focus: '#339cff', surface: '#ffffff', ink: '#1a1c1f', sidebar: '#eef4f9' },
-  dark: { accent: '#0169cc', focus: '#339cff', surface: '#181818', ink: '#ffffff', sidebar: '#181818' },
+  dark: { accent: '#0169cc', focus: '#339cff', surface: '#111111', ink: '#ffffff', sidebar: '#181818' },
 };
 
 /**
@@ -227,7 +231,12 @@ export function themeOverrideCss(values = {}) {
 }
 
 /**
- * 一组合法的字体栈（不许出现会闭合声明的字符）。
+ * 一组合法的字体栈（不许出现会闭合声明、或能改变后文切分的字符）。
+ *
+ * 值是原样拼进覆盖层 `<style>` 的，所以除了 `; { } < >` 与 `url(` 还要挡三类：
+ *   · 反斜杠 —— CSS 转义，`u\72l(` 在分词器眼里就是 `url(`，上面那条字面检查拦不住；
+ *   · 注释起止 `/*` `*\/` —— 值里开一个注释会把后面的声明连同深色那一整块一起吞掉；
+ *   · 控制字符与不成对的引号 —— 换行会断开字符串记号，半个引号会把后文读成字符串。
  * @param value - 待检查的值。
  * @returns 合法则 true。
  */
@@ -235,7 +244,9 @@ export function isFontStack(value) {
   if (typeof value !== 'string') return false;
   const s = value.trim();
   if (s === '' || s.length > 200) return false;
-  return !/[;{}<>]/.test(s) && !/url\(/i.test(s);
+  if (/[;{}<>\\]/.test(s) || /url\(/i.test(s) || s.includes('/*') || s.includes('*/')) return false;
+  if (/[\u0000-\u001f\u007f]/.test(s)) return false;
+  return (s.split('"').length - 1) % 2 === 0 && (s.split("'").length - 1) % 2 === 0;
 }
 
 /**

@@ -2,25 +2,28 @@
    codex-ink（墨白终端）· L3 组件层契约
    ----------------------------------------------------------------------------
    治理目标（对应方案 §7）：
-     ① 卡片统一契约：纯描边 + 10px 圆角 + 近零阴影 + 16px padding；
+     ① 卡片统一契约：纯描边 + 12px 圆角（--dsw-radius-m）+ 近零阴影 + 16px padding；
      ② 徽标/chip 统一 mono pill；
      ③ 彩色白名单归一：插件自带调色板收敛到 state 三色 + 墨灰；
      ④ hover = 背景升一档，禁自创投影；
      ⑤ 焦点环、cursor、动效时长三条 a11y/交互底线。
 
-   锚点纪律：只使用 skin-center 语义属性契约
-   （data-dsh-surface / data-dsh-part / data-dsh-plugin / data-slot），
-   不使用 CSS-Modules 哈希类名（[class*=…]），以免触发加载器的
-   "reliance on CSS-Modules hash class names" 警告。
+   锚点纪律：优先使用 skin-center 语义属性契约
+   （data-dsh-surface / data-dsh-part / data-dsh-plugin / data-slot）。
+   宿主没有 data-* 的位置（⑰ 加号与两个触发器）才退到 CSS-Modules 类名的
+   **后缀**写法（方括号 class 属性后缀匹配），只依赖语义后缀、不依赖随构建变化的哈希前缀；
+   哈希全名一律不用。计数由 src/build.mjs 每次构建自报。
    ========================================================================== */
 
-/* ── ① 焦点环：2px Codex 强调蓝 + 2px offset（-—color-border-focus，亮 #339cff / 暗 70%） ─ */
+/* ── ① 焦点环：2px Codex 强调蓝 + 2px offset（--color-border-focus，亮 #339cff / 暗 70%）
+   颜色读宿主的 --dsw-focus-ring-color（skin.css 已把它接到 --dsw-codex-focus）：宿主在指针
+   操作时就地把它置成 transparent，读令牌才能继承这条「鼠标点击不出环」的约定。 ── */
 :focus-visible {
-  outline: 2px solid var(--dsw-codex-focus);
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: 2px;
 }
 
-/* ── ② 链接 = 墨 + hover 下划线，不着色 ─────────────────────────────────── */
+/* ── ② 链接 = 强调色（--dsw-alias-link）+ hover 下划线 ──────────────────── */
 a {
   color: var(--dsw-alias-link);
   text-decoration: none;
@@ -33,7 +36,7 @@ a:focus-visible {
   text-decoration: underline;
 }
 
-/* ── ③ 可点击元素：cursor + 100ms 干脆过渡 ──────────────────────────────── */
+/* ── ③ 可点击元素：cursor + 150ms 干脆过渡（--dsw-motion-fast） ─────────── */
 button,
 a,
 summary,
@@ -82,7 +85,7 @@ button[aria-disabled="true"],
   padding: var(--dsw-space-4);
 }
 
-/* 弹层 / 模态：大圆角 + 一点点软影 */
+/* 弹层 / 模态：大圆角（阴影交给宿主的 elevation 令牌，本层不另画） */
 [role="dialog"],
 [data-dsh-surface="overlay"] [data-dsh-part="panel"] {
   border-radius: var(--dsw-radius-l);
@@ -150,16 +153,14 @@ button[aria-disabled="true"],
   border-radius: var(--dsw-radius-s);
 }
 
-/* ── ⑧ 输入区：工具不是主角，14px 圆角 + 纯描边 ──────────────────────────
-   卡片（[data-composer-card]）的圆角只在 ⑭ 层（composer.css）声明一处：20px，
-   corner-shape 可用时 25px 超椭圆。旧版这里还写着 var(--dsw-radius-l)=16px，
-   与 ⑭ 层构成同一元素的第二真源，谁生效只看选择器权重 —— 已删。 */
+/* ── ⑧ 输入区：工具不是主角，16px 圆角（--dsw-radius-l）+ 纯描边 ─────────────
+   卡片（[data-composer-card]）的**圆角与阴影**只在 ⑭ 层（composer.css）声明一处：
+   圆角 20px（corner-shape 可用时 25px 超椭圆），阴影是 Codex --elevation-composer 三层。
+   旧版这里还各写过一次 —— 圆角 var(--dsw-radius-l)=16px、阴影 var(--dsw-elevation-panel) ——
+   与 ⑭ 层构成同一元素的第二真源，谁生效只看选择器权重。两条都已删：宿主只在会话滚动区里
+   渲染这张卡（真 GUI 实测 1 张、且在 [data-conversation-scroll] 内），⑭ 层全覆盖。 */
 [data-dsh-surface="composer"] [data-dsh-part="composer-input"] {
   border-radius: var(--dsw-radius-l);
-}
-
-[data-composer-card] {
-  box-shadow: var(--dsw-elevation-panel);
 }
 
 [data-dsh-part="composer-input"] {
@@ -210,9 +211,12 @@ button[aria-disabled="true"],
      · 触发器 = 宿主原生形态（模型名 + 强度 + chevron），本层不重绘，
        只把焦点环归一成一条细线。旧版藏 chevron、改 mono 字体、压 24px 高，
        实测与仓库截图 conversation-light.png 的触发器不符，全部撤掉。
-     · 菜单面板 = 仓库 composer-tool-menus 的皮肤契约：不透明白 + 大圆角 +
-       软影 0 8px 32px + 1px 描边环；行 28px、内衬 4px 9px、圆角 8px、
+     · 菜单面板 = 仓库 composer-tool-menus 的皮肤契约：不透明白 + 18px 圆角 +
+       软影 0 8px 32px + 1px 描边环；行 28px、内衬 4px 9px、圆角 13px（同心：18 − 内衬 5）、
        hover 淡填充。旧版 TUI 编号行、页脚提示行、隐藏勾选列一并废弃。
+     · 设置卡的「Codex 模型选择器」开着时，这一席位由 model-picker.css 的自建组件顶替，
+       本段只在开关关掉（或组件没挂上）时作用于宿主原生菜单 —— 即 A 面退化路径
+       （B 面组件见 docs/plan-model-picker.zh-CN.md）。
      · 选中行 = 淡填充 + 勾选图标；pending 行 = 行尾 StateDot 转圈。
        旧版把行尾整列 display:none，点强度后转圈被藏、全列表又被全局
        disabled 规则压到 45% 透明度 —— 点了像没反应，这就是「选择推理
@@ -225,7 +229,7 @@ button[aria-disabled="true"],
 
 /* ── ⑫·1 触发器：只归一焦点环（官方 box-shadow 环 + 全局 2px outline → 1px 细线） ── */
 [data-slot="conversation.input.model"] button:focus-visible {
-  outline: 1px solid var(--dsw-codex-focus);
+  outline: 1px solid var(--dsw-focus-ring-color);
   outline-offset: 1px;
   box-shadow: none;
 }
@@ -278,7 +282,7 @@ body > div[role="menu"][aria-busy] button[role="menuitemradio"][aria-checked="tr
 /* 键盘焦点：全局 2px 环在菜单内不贴行盒，改 1px 内描线 */
 body > div[role="menu"][aria-busy] button[role="menuitem"]:focus-visible,
 body > div[role="menu"][aria-busy] button[role="menuitemradio"]:focus-visible {
-  outline: 1px solid var(--dsw-codex-focus);
+  outline: 1px solid var(--dsw-focus-ring-color);
   outline-offset: -1px;
   background: var(--dsw-alias-interactive-bg-active);
 }
@@ -377,7 +381,7 @@ body[data-ds-dark-theme] [data-codex-filebar] {
    titleRow 的官方布局是 titleCluster（flex:1）+ utilities + corner，
    故去掉旧版的 justify-content:flex-end —— 标题要留在左边。
 
-   ⚠ 本注释块里**不能出现花括号**（左右都不行）：scripts/install-plugin.mjs 的
+   ⚠ 本注释块里**不能出现花括号**（左右都不行）：src/build.mjs 的
    scopeCss 是按「下一个左花括号」做括号配对的，注释里混进一个花括号就会把
    后面的规则整段错位 —— 实测表现为紧随其后的规则被重复加 html[data-codex-ui]
    前缀而失效、整份 theme.css 花括号数不平衡。所以注释里只写行式记法。 */
@@ -391,7 +395,7 @@ body[data-ds-dark-theme] [data-codex-filebar] {
    配色不动：条目只用 --dsw-* 语义令牌（--dsw-alias-label-tertiary、--dsw-alias-interactive-bg-hover、
    --dsw-alias-border-l4 …），本皮肤已重锚这些令牌，因此跟着现在的配色走，不需要另配一套色。
    出口恒为 div[data-slot=槽名][style=display:contents]，不需要也不应该改出口本身。
-   ⚠ 本部注释里不能出现花括号（install-plugin.mjs 的 scopeCss 按花括号配对）。 */
+   ⚠ 本部注释里不能出现花括号（src/build.mjs 的 scopeCss 按花括号配对）。 */
 [data-slot="conversation.session.header"] > [data-conversation-tabs] {
   display: none;
 }

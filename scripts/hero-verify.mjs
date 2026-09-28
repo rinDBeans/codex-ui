@@ -56,6 +56,22 @@ const theme = fs.readFileSync(join(WB, 'theme.css'), 'utf8');
 const AP = fs.readFileSync(join(ROOT, 'dsh-client-ui-agent-preset', 'lib', 'client.js'), 'utf8');
 const labelCss = cssFor('@deepseek-ai/dsh-client-ui-agent-preset/AgentPresetLabel.module.css', AP);
 const L = mapFor('AgentPresetLabel_module_css_default', AP);
+/**
+ * 徽标圆角的**宿主原值**：rc.1 在 .label 上写字面量 6px，rc.2 改成 var(--dsw-radius-xs)（宿主 ui-theme
+ * 给 4px）。断言防的是「本皮肤改写了它」，所以期望值从宿主源码里现取，不写死某一版的字面量。
+ */
+const labelRadius = (() => {
+  const rule = new RegExp('\\.' + L.label + '\\{([^}]*)\\}').exec(labelCss);
+  const decl = rule === null ? null : /border-radius:([^;]+)/.exec(rule[1]);
+  if (decl === null) throw new Error('宿主徽标规则里找不到 border-radius：' + L.label);
+  const value = decl[1].trim();
+  const token = /^var\((--[\w-]+)\)$/.exec(value);
+  if (token === null) return value;
+  const themeSrc = fs.readFileSync(join(ROOT, 'dsh-client-ui-theme', 'lib', 'client.js'), 'utf8');
+  const declared = new RegExp(token[1] + ':\\s*([^;}]+)').exec(themeSrc);
+  if (declared === null) throw new Error('宿主 ui-theme 没有声明 ' + token[1]);
+  return declared[1].trim();
+})();
 
 const chip = (label, glyph) => '<button type="button" style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:0;background:transparent;font:inherit;cursor:pointer">' + glyph + '<span>' + label + '</span></button>';
 
@@ -217,8 +233,8 @@ const checks = [
   ['页签仍隐去', hdr.header.tabs === false],
   ['右上角按钮仍在', hdr.header.corner === true],
   ['徽标配色 = 本皮肤 --dsw-alias-label-tertiary', hdr.presetLabel.color === 'rgb(118, 118, 118)'],
-  /* 徽标圆角是**官方自带的字面量 6px**（.SVAs4q_label），不是本皮肤的刻度；这条断言防的是我们误改它。 */
-  ['徽标圆角保持官方 6px（未被皮肤改写）', hdr.presetLabel.radius === '6px'],
+  /* 徽标圆角是**宿主自己的值**（rc.1 字面量 6px / rc.2 的 --dsw-radius-xs），不是本皮肤的刻度；这条断言防的是我们误改它。 */
+  ['徽标圆角保持宿主原值 ' + labelRadius + '（未被皮肤改写）', hdr.presetLabel.radius === labelRadius],
   ['徽标高 22px（官方控件高度，未改写）', hdr.presetLabel.h === 22],
   ['徽标不填底色（令牌未定义即透明，不另配色）', hdr.presetLabel.bg === 'rgba(0, 0, 0, 0)'],
   /* ⑭ 上栏条（hero 工作区行）只有上面两角是圆角，它探在卡片背后，与卡片同心叠放。

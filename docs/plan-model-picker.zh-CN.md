@@ -1,5 +1,23 @@
 # 计划：把模型选择器做成真组件（对齐 dsh-claude-style 的做法）
 
+> **状态：已执行（0.6.0，2026-09-28）。** 组件 `src/model-picker.js`，样式 `skins/codex-ink/model-picker.css`，
+> 设置卡开关 `modelPicker`（默认开）。验收：`scripts/power-rail-verify.mjs` 夹具 47/47、`check-repo` 3 条纯函数与样式纪律断言、
+> 真 GUI（`dsh web` 0.1.7-rc.2）`live-gui-probe.mjs` B 面 7 条 + `settings-page-verify.mjs` 开关 5 条。
+>
+> 注：606faea 曾以同名 0.6.0 提交过一次，但那次只提交了生成物 `client.js`，组件与样式的源文件、构建改动、
+> 体检与真 GUI 探针都没进仓库（`build.mjs --check` 在它上面必然过期），随即 revert。本次是完整重做。
+>
+> 与下文计划的出入（都有依据，逐条记在这里）：
+>
+> | 计划 | 实际 | 为什么 |
+> |---|---|---|
+> | 给宿主触发器打 `data-*` 标记再隐藏 | 不打标记：一条直接子代 `:has(> .codex-mp-trigger)` 隐藏席位里其余子节点 | React 换掉宿主子节点时标记会丢、宿主控件闪回；`:has()` 只看「我们在不在席」，摘掉触发器宿主立刻复原（夹具「宿主换掉自己的子节点后仍隐藏」一条守着） |
+> | 会话 id 读 `uiSession.current.value.key` | 先读席位祖先的 `data-conversation-session`，再退到 `uiSession` | 右栏侧边聊天有自己的 composer 席位，主视图会话 id 对它是错的；宿主 ConversationRoot 本来就把会话 id 打在祖先上 |
+> | 1s 轮询 + 席位 childList 观察器 | body 子树 childList 观察器（只看元素增删 + `data-conversation-session`），回调里同步对账 | 流式输出只改文本节点，不会打进来；新席位出现的那一帧就接上，宿主控件不先闪一下 |
+> | `ctx.get('modelDirectories')` 取服务 | `ctx.inject(['modelDirectories'], …)` | 宿主自己挂模型位就这么等；服务不在不阻塞皮肤激活，服务撤走时作用域连同节点一起回收 |
+> | 卡片 12px 圆角 / 行 34px | 弹层 254px（Codex `spacing × 63.5`）、18px 圆角、行 28px / 13px（⑫ 同心契约） | 与 A 面菜单同一副面孔；宽度是 Codex 源码值 |
+> | 往返期间保持列表 | 保持列表 **且** 轨与触发器按 pending 那一档乐观显示、档位名旁转圈 | 只保列表的话，轨在 ~1.1s 往返里会弹回旧档再跳到新档 |
+
 > 起因：0.5.0 用纯 CSS 把宿主菜单的竖列 radio 重排成轨，实测**切换卡顿、界面简陋、不像 Codex**。
 > 已 `git revert`（提交 0f49758）。本文记录从 `dsh-claude-style` 里取到的**做法**，以及下一版的落地契约。
 
@@ -14,7 +32,7 @@
 
 ## 1. dsh-claude-style 的做法（可复制的配方）
 
-包位置：`C:\Users\Zs\.dsh\profiles\desktop\node_modules\dsh-claude-style`，实现全在 `lib/client.js`。
+包位置：`$DSH_HOME/profiles/desktop/node_modules/dsh-claude-style`，实现全在 `lib/client.js`。
 
 ### 1.1 夺席位（不抢 slot，靠 DOM 顶替）
 

@@ -2,6 +2,108 @@
 
 [简体中文](CHANGELOG.zh-CN.md)
 
+## 0.6.0 - 2026-09-28
+
+Face B of the model picker (the Codex reasoning power rail) lands, together with a full-repository review against the
+replication spec and fixes for what it confirmed.
+
+### ⑳ Model picker face B: our own component takes over the model seat
+
+- **Seat takeover in the DOM, never parasitic on the host menu** (0.5.0's CSS re-layout was slow and bare, and was
+  reverted). Our trigger is appended to `[data-slot="conversation.input.model"]` and the popover to `document.body`;
+  while our trigger is in the seat, **one** direct-child `:has()` in `model-picker.css` sets the host's child to
+  `display:none` (it stays in the React tree). No marker attribute: React replacing the host child would drop it and the
+  host control would flash back; `:has()` only asks "are we seated", and removing our trigger restores the host at once.
+- **Data and commits go through the host only**: `ctx.inject(['modelDirectories'], …)` waits for the service (the same
+  hook the host uses for its own seat; a missing service never blocks the skin), subscribes to `directoryFor(session).store`
+  and commits with `select({ provider, model, reasoningEffort })`. The session id comes from the seat's
+  `data-conversation-session` ancestor (the right-bar side chat has its own seat), falling back to `uiSession`. Seats the
+  host did not render (subagent sessions) are left alone.
+- **Power rail verbatim from the Codex source**: track 24px / radius 12 / 10% foreground / `inset .5px` stroke; ticks
+  4px with a 16px hit area, passed ticks 30% white; thumb a 28px white disc / `.5px` strong stroke / `0 0 2px` shadow;
+  filled part in the accent, ending at the thumb centre; motion `.3s cubic-bezier(.23,1,.32,1)`, thumb 0s on the first
+  frame and .3s after 16ms. Popover 254px wide (`spacing × 63.5`), enters in `.32s … 30ms` from `scale(.98)`; placed like
+  the host `place()` (right-aligned, 8px above, 12px viewport margin).
+- **Interaction**: real drag (grab on press → free slide with **no commit** → one commit snapped to the nearest level on
+  release), `touch-action: none`; ←/→/Home/End; keyboard focus draws the 2px ring on the thumb; Escape closes and returns
+  focus (also when a mouse-open left focus on the trigger); choosing a model commits that model's default effort and
+  closes on success. Level count and names come from `reasoning.efforts`.
+- **During the round trip** (the host marks the directory `selecting` for the whole selectModel round trip): status is
+  not part of the list signature, so the card is neither redrawn nor cleared; the rail and trigger show the pending level
+  optimistically with a spinner beside it (on a model change, at the end of that row). On failure the popover shows the
+  host's own message (with the session-in-use case spelled out) and the rail returns to the effective level.
+- The trigger's effort label follows Codex `_ModelPickerTriggerEffortText`: all names stacked in one cell with a blurred
+  cross-fade, so the width never jumps.
+- Copy is borrowed from the host `model` namespace first (word-for-word with the native menu, built-in model descriptions
+  localized too); our own table is only the fallback.
+- New settings row "Codex model picker" (`modelPicker`, **on by default**). Off removes every node of ours and the host
+  menu (⑫ face A) returns at once; while the settings document has not arrived the component does not take over, so it
+  never flashes on and off. **`Config` therefore has 12 fields** (the replication spec lists 11 plus the theme preference).
+- **Not built**: the three advanced states of the Codex rail (highlight, Fast-mode tick fly-out, the purple/blue gradient
+  beyond the maximum) — DSH has neither Fast mode nor that state; the purple Max label on the trigger is skipped too,
+  being outside the color whitelist.
+- Note: 606faea once committed a 0.6.0 under the same name, but only the generated `client.js` — the component and style
+  sources, the build change, the checks and the probe never reached the repository — and it was reverted. This release is
+  a complete redo with sources, build and verification committed together.
+
+### Review fixes
+
+- **Two sources for the composer shadow**: `patches.css` ⑧ still carried `[data-composer-card] { box-shadow:
+  var(--dsw-elevation-panel) }`, a second source next to `composer.css` ⑭'s three Codex layers (specificity decided the
+  winner). The host only renders this card inside the conversation scroller; removed.
+- **`--dsw-elevation-soft` is no longer invented**: 0.5.10's `0 8px 28px` at 10% ink (55% black in dark) had neither a
+  measurement nor a source anchor, yet it landed on the host `SegmentedControl` thumb — every segmented control in
+  settings wore it. The host's own value is back in charge.
+- `--dsw-elevation-stroke` is now `0 0 0 .5px var(--dsw-elevation-stroke-color)` (the spec's wording; computed value unchanged).
+- **Font stacks** are declared verbatim once in `skin.css` (checked word-for-word against the host 0.1.7-rc.2
+  base_css_default), so the look no longer drifts with the host version.
+- **Focus ring wired to the host token**: `--dsw-focus-ring-color: var(--dsw-codex-focus)`. The host's ten box-shadow ring
+  rules used to fall back to ink and are now Codex blue; the skin's own rings read the token too, which makes them honour
+  the host's "no ring for pointer input" contract (under `html[data-input-modality=pointer]` the host sets it to
+  transparent in place).
+- New `--dsw-codex-border` (10% / 12%) and `--dsw-codex-border-strong` (15% / 20%) — Codex's `--color-border` and
+  `--color-border-strong`.
+- **Wrong dark default on the settings card**: `SKIN_DEFAULTS.dark.surface` was still `#181818` although the dark window
+  background has been `#111111` since 0.5.6, so the background swatch showed a "follow skin" value that was not the skin's.
+  Fixed; `check-repo` now reconciles every field against skin.css and fails on drift.
+- `.cx-error` read a token that does not exist (`--dsw-alias-state-error`), so "the save did not take effect" was plain
+  text colour; it now reads `error-primary`.
+- **Font stack validation hardened**: `isFontStack` also rejects backslashes (`u\72l(` tokenizes as `url(`), comment
+  delimiters (a comment opened inside the value swallowed the whole dark override block), control characters and
+  unbalanced quotes. `check-repo` asserts the "dark block survives" outcome on the generated CSS.
+- **The installer wrote invalid YAML on a fresh profile**: dsh rc.2 creates `cordis.patch.yml` as a flow-style `[]`, and
+  appending `- insert:` after it made `dsh web` die at boot with `failed to parse overlay`. An empty `[]` is now removed
+  first; a non-empty flow list is refused with a hint.
+- **A local path shipped in the artifacts**: a clone path in a `composer.css` comment was copied verbatim into `theme.css`
+  and `client.js`, while the repository check only scanned JS and missed the JSON-escaped double backslash. The check now
+  covers stylesheets and docs in both spellings; local paths in `docs/` became placeholders.
+- Stale comments: card radius 10px → 12px, "links are ink" → accent, 100ms → 150ms transitions, composer 14px → 16px,
+  ⑫ row radius 8 → 13, `install-plugin.mjs` → `src/build.mjs` in the layer headers, "five stylesheets" in `build.mjs`,
+  and the skin README's file table and "links are ink" rule.
+
+### Verification
+
+- **New** `scripts/power-rail-verify.mjs` (47 assertions, Chromium only): the real component and the real theme.css
+  against a fake directory written to the host contract, with `select()` slowed to 600ms on purpose — the real host
+  answers locally in under 60ms, too fast to observe pending behaviour in the live GUI. It found and fixed two defects:
+  built-in model descriptions rendered the dictionary key when no host dictionary was present, and Escape did nothing
+  while a mouse-open left focus on the trigger.
+- **New** `scripts/pack-host-asar.mjs`: without a desktop shell, packs npm-installed host packages (the same set the shell
+  ships) into an `app.asar` the fixtures can read.
+- `hero-verify.mjs`: "badge radius stays the official 6px" hard-coded rc.1's literal; rc.2 changed it to
+  `var(--dsw-radius-xs)` (the host gives 4px), so it always failed on rc.2. The expected value is now read from the host source.
+- `live-gui-probe.mjs`: a fresh profile opens with two onboarding dialogs and the probe's clicks landed on their backdrop
+  — that is where the three "measured none" right-panel failures came from; the dialogs are dismissed first now. The model
+  seat is measured as face B (7 assertions: takeover, geometry, a keyboard change written into the host store and reverted);
+  with face B off it measures the face A pending window, with `--latency` (800ms by default) added to that round trip,
+  otherwise the window closes before the first sample. The probe puts the effort back afterwards.
+- `settings-page-verify.mjs`: 9 rows; the dark background assertion still expected the pre-0.5.6 `#181818` and now expects
+  `#111111`; five new assertions for the switch (off, reload, no trigger of ours in the seat, host control visible, reset).
+- Full run (npm `@deepseek-ai/dsh@0.1.7-rc.2` + an asar packed from it + Edge/Chromium 153; live GUI on a `dsh web` of the
+  same version): `check-repo` 23/23 · `audit` 36/36 · `elevation` 19/19 · `composer-shadow` 23/23 · `model-picker` 20 ·
+  `power-rail` 47/47 · `rightbar` 42 · `hero` 25 · `sidebar-align` 6/6 · `sidebar-surface` 13/13 · live `live-gui-probe`
+  face B 14/14, face A 10/10 · `settings-page-verify` 29/29 · `theme-flash-probe` 9 windows, 0 intermediate frames (click → colour median 23ms).
+
 ## 0.5.10 - 2026-09-28
 
 A third Codex capture let the composer's ring be pinned down without depending on the device pixel ratio — and it

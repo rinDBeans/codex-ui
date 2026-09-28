@@ -1,11 +1,12 @@
 /**
  * codex-ui — Browser half（唯一样式源是 skins/codex-ink，经 src/build.mjs 生成；本文件是模板，勿手改）。
  *
- * 职责三件：
- *   1. 把 <workbench>/skins/codex-ink 的整套 Codex 化样式（L1/L2 令牌 + L3 组件层 + 设置页层）
+ * 职责四件：
+ *   1. 把 skins/codex-ink 的整套 Codex 化样式（L1/L2 令牌 + L3 组件层 + 设置页层）
  *      以作用域 html[data-codex-ui] 注入到文档，并在卸载时完整收回；
  *   2. 把设置页的取值渲染成一层覆盖（多一个属性 ⇒ 特异性压过皮肤，源样式一个字不动）；
- *   3. 在官方插件管理的组合包页（座位 plugins.bundle.config）注册那张配置卡。
+ *   3. 在官方插件管理的组合包页（座位 plugins.bundle.config）注册那张配置卡；
+ *   4. 用自建组件顶替 composer 的模型位（Codex 模型列表 + 推理等级功率轨），设置里可关。
  * 不依赖 skin-center / dsh-web-all：样式文本随本文件一起下发，无外部请求。
  */
 window.__ModuleLoader__.load({
@@ -35,6 +36,8 @@ window.__ModuleLoader__.load({
     const CSS = /*__CODEX_UI_CSS__*/ null;
     /** 生成期注入的覆盖层模块（源：src/override.js）。 */
     const __override = /*__CODEX_UI_OVERRIDE__*/ null;
+    /** 生成期注入的模型选择器组件（源：src/model-picker.js）。 */
+    const __modelPicker = /*__CODEX_UI_MODEL_PICKER__*/ null;
     /* 生成期注入的设置卡片（源：src/settings-card.js）。 */
     /*__CODEX_UI_SETTINGS__*/ null
 
@@ -87,17 +90,74 @@ window.__ModuleLoader__.load({
         console.warn('[codex-ui] ctx.effect 不可用：样式已注入，但不会随 fiber 卸载回收。');
       }
       /* 设置页那一半：任何一步失败都只降级，不能连皮肤一起拖下水。 */
+      let formScope = null;
       try {
-        installSettings(ctx, root);
+        formScope = installSettings(ctx, root);
       } catch (error) {
         console.warn('[codex-ui] 设置页挂载失败，皮肤照常：', error);
       }
+      /* 模型选择器同理：挂不上就把席位留给宿主原生菜单（A 面样式照常生效）。 */
+      try {
+        installModelPicker(ctx, formScope);
+      } catch (error) {
+        console.warn('[codex-ui] 模型选择器挂载失败，宿主原生菜单照常：', error);
+      }
+    }
+
+    /**
+     * 模型选择器 B 面（src/model-picker.js）。
+     *
+     * 等宿主的 modelDirectories 服务就绪再装：ctx.inject(deps, fn) 是宿主自己挂 composer 模型位的
+     * 同一个口子（dsh-client-ui-model-selection 也是这么等的）。服务不在时不阻塞本插件激活 ——
+     * 不能把它写进上面的 inject 列表，那样缺一个服务整个皮肤都停在 pending；服务撤走时 fn 的作用域
+     * 连同我们的节点一起回收。
+     * 设置卡的「Codex 模型选择器」（modelPicker，默认开）关掉 → setEnabled(false)：自建节点全撤，
+     * 宿主那一格经 model-picker.css ① 的 :has() 立刻复原。
+     * @param ctx - 客户端上下文。
+     * @param formScope - 本插件的设置表单；没有设置服务时为 null（此时按默认开）。
+     */
+    function installModelPicker(ctx, formScope) {
+      if (typeof ctx.inject !== 'function') {
+        console.warn('[codex-ui] ctx.inject 不可用：模型选择器不挂，宿主原生菜单照常。');
+        return;
+      }
+      /** 设置文档里的开关；文档还没到时返回 null（保持现状，不先接管再撤回）。 */
+      const wanted = () => {
+        if (formScope === null) return true;
+        const snapshot = formScope.getSnapshot();
+        if (snapshot !== undefined && snapshot !== null && snapshot.value === undefined) return null;
+        const value = snapshot === undefined || snapshot === null || snapshot.value === null ? {} : snapshot.value;
+        return value.modelPicker !== false;
+      };
+      ctx.inject(['modelDirectories'], (scope) => {
+        const picker = __modelPicker.installModelPicker({
+          models: scope.modelDirectories,
+          /* 席位祖先上没有 data-conversation-session 时退到主视图会话（uiSession 投影）。 */
+          sessionFallback: () => {
+            const ui = ctx.reflect.get('uiSession');
+            const current = ui === undefined || ui === null ? null : ui.current;
+            return current === undefined || current === null || current.value === undefined || current.value === null ? null : current.value.key;
+          },
+          locale: ctx.reflect.get('locale'),
+          enabled: wanted() === true,
+        });
+        const sync = () => {
+          const next = wanted();
+          if (next !== null) picker.setEnabled(next);
+        };
+        const off = formScope !== null && typeof formScope.subscribe === 'function' ? formScope.subscribe(sync) : null;
+        scope.effect(() => () => {
+          if (typeof off === 'function') off();
+          picker.dispose();
+        }, 'codex-ui: model picker');
+      });
     }
 
     /**
      * 挂上覆盖层与组合包页的配置卡。
      * @param ctx - 客户端上下文。
      * @param root - <html>。
+     * @returns 本插件的设置表单（模型选择器的开关也读它）；没有设置服务时 null。
      */
     function installSettings(ctx, root) {
       const forms = ctx.configForms === undefined || ctx.configForms === null ? null : ctx.configForms;
@@ -105,7 +165,7 @@ window.__ModuleLoader__.load({
       if (scope === null || scope === undefined) {
         /* 没有设置服务：不注册座位、不加覆盖层，皮肤照常。 */
         console.warn('[codex-ui] 没有 configForms 服务：设置页不可用，皮肤照常。');
-        return;
+        return null;
       }
       const tag = document.createElement('style');
       tag.dataset.plugin = PLUGIN_ID;
@@ -210,6 +270,7 @@ window.__ModuleLoader__.load({
         /* 点下去立刻按目标主题显示，文档往返在背后跑。 */
         previewTheme,
       });
+      return scope;
     }
 
     return { apply, inject, PLUGIN_ID };

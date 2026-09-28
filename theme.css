@@ -86,6 +86,20 @@
   --dsw-codex-hover-fill: #f2f2f3;
   /* 焦点环：Codex --color-border-focus = --blue-300 = #339cff（亮色直接取色） */
   --dsw-codex-focus: #339cff;
+  /* 宿主的焦点环令牌接到 Codex 焦点色上。宿主 ui-theme 的 :focus-visible 与 10 条用
+     box-shadow 画环的组件规则都读 var(--dsw-focus-ring-color, 墨色回落)，而宿主从不在根上
+     声明它 —— 不接的话那 10 处聚焦时是墨色内环。宿主在指针操作时会把它就地置成 transparent
+     （html[data-input-modality=pointer] … :focus-visible），本皮肤的环也读这个令牌，
+     所以同一条「鼠标点击不出环」的宿主约定对皮肤一样生效。
+     var() 在声明它的元素上解析：body 上读到的是 body 自己的 --dsw-codex-focus，
+     深色那一档（70%）因此不需要再写一遍。 */
+  --dsw-focus-ring-color: var(--dsw-codex-focus);
+  /* Codex 的两条中性描边（app.asar 令牌，CHANGELOG 0.5.9 / 0.5.10 取证）：
+       --color-border        = --alpha-10（亮）/ --alpha-12（暗）
+       --color-border-strong = 15%（亮）/ 20%（暗）
+     输入卡环与功率轨描边用前者，功率轨拇指用后者。 */
+  --dsw-codex-border: rgba(13, 13, 13, 0.1);
+  --dsw-codex-border-strong: rgba(13, 13, 13, 0.15);
   --dsw-alias-interactive-bg-active: rgba(13, 13, 13, 0.08);
   --dsw-alias-interactive-bg-hover-solid: #f1f1ef;
   --dsw-alias-interactive-bg-hover-accent: rgba(13, 13, 13, 0.06);
@@ -243,6 +257,8 @@
   --dsw-codex-hover-fill: rgba(255, 255, 255, 0.08);
   /* 焦点环：Codex 深色 --color-border-focus = --blue-300 70%，即 #339cffb3。 */
   --dsw-codex-focus: rgba(51, 156, 255, 0.7);
+  --dsw-codex-border: rgba(255, 255, 255, 0.12);
+  --dsw-codex-border-strong: rgba(255, 255, 255, 0.2);
   --dsw-alias-interactive-bg-active: rgba(255, 255, 255, 0.1);
   --dsw-alias-interactive-bg-hover-solid: #282828;
   --dsw-alias-interactive-bg-hover-accent: rgba(255, 255, 255, 0.08);
@@ -383,6 +399,14 @@
   --dsw-leading-xl: 1.35;
   --dsw-leading-2xl: 1.25;
 
+  /* 字体栈（原样照抄宿主 dsh-client-ui-theme 的 base_css_default，0.1.7-rc.2 逐字比对一致）。
+     本皮肤自己声明一次，外观就不随宿主版本漂：UI 栈系统字体优先 + 中文回退链，
+     代码栈等宽优先 + 中文回退，两条都保留中文回退。设置页 fontUi / fontCode 覆盖的就是这两个令牌。 */
+  --dsw-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ds-font-family-code: "SF Mono", "JetBrains Mono", "Fira Code", Consolas,
+    "Liberation Mono", Menlo, Courier, "PingFang SC", "Microsoft YaHei";
+
   /* 元信息 mono 规约：等宽 + 大写 + 加宽字距（Codex TUI 血统） */
   --dsw-font-meta: var(--ds-font-family-code);
   --dsw-meta-size: 11px;
@@ -420,7 +444,10 @@
 /* 官方把 --dsw-elevation-* 声明在 body, body * 上，因此必须同样覆盖到 body *，
    否则每个后代元素都会用自身声明盖掉从 body 继承下来的值。 */html[data-codex-ui] body,html[data-codex-ui] body *{
   --dsw-elevation-stroke-color: rgba(13, 13, 13, 0.08);
-  --dsw-elevation-stroke: 0 0 0 0.5px rgba(13, 13, 13, 0.08);
+  /* 描边几何引用颜色令牌，而不是把同一个 rgba 再抄一遍：颜色只有上一行这一个真源，
+     亮暗两套各改一处即可（Codex 原文 --elevation-stroke 同样是「几何 + 颜色令牌」）。
+     同一元素上声明、同一元素上解析，所以 body * 上逐元素都取到本元素的颜色。 */
+  --dsw-elevation-stroke: 0 0 0 0.5px var(--dsw-elevation-stroke-color);
   --dsw-elevation-panel: var(--dsw-elevation-stroke);
   /* Codex --elevation-prominent 逐字（app.asar @67930856）：
        var(--elevation-stroke), 0 3px 7.5px #0000000a, 0 0 20px #0000000d
@@ -428,18 +455,19 @@
      这个令牌是**宿主菜单与面板**的主阴影（.QsffPG_menu / ._7KE1Ra_menu / .JObwrW_panel
      等 14 处消费），不是边角料。 */
   --dsw-elevation-prominent: var(--dsw-elevation-stroke), 0 3px 7.5px #0000000a, 0 0 20px #0000000d;
-  /* --dsw-elevation-soft 在 Codex 里**没有同名令牌**（Codex 只有 stroke / stroke-subtle /
-     prominent / sidebar / composer / composer-dark）。这是本皮肤自造的一档，保留待验。 */
-  --dsw-elevation-soft: var(--dsw-elevation-stroke), 0 8px 28px rgba(13, 13, 13, 0.1);
+  /* --dsw-elevation-soft **不覆盖**，交还宿主自己的值（stroke + 0 4px 16px #00000008 + 0 0 24px #00000008）。
+     Codex 没有同名令牌（只有 stroke / stroke-subtle / prominent / sidebar / composer / composer-dark），
+     0.5.10 及以前这里写的 0 8px 28px 10% 墨（暗色 55% 黑）既无截图读数也无源码锚点，
+     却落在宿主 SegmentedControl 的选中片上 —— 设置页每个分段控件都背着一团自造的大影。
+     宿主值里的第一层仍是 var(--dsw-elevation-stroke)，所以描边照样跟本皮肤走。 */
 }html[data-codex-ui] body[data-ds-dark-theme],html[data-codex-ui] body[data-ds-dark-theme] *{
   --dsw-elevation-stroke-color: rgba(255, 255, 255, 0.09);
-  --dsw-elevation-stroke: 0 0 0 0.5px rgba(255, 255, 255, 0.09);
+  --dsw-elevation-stroke: 0 0 0 0.5px var(--dsw-elevation-stroke-color);
   --dsw-elevation-panel: var(--dsw-elevation-stroke);
   /* 这里**不再覆盖** --dsw-elevation-prominent**：Codex 只在 :root 声明一次、没有暗色变体，
      所以暗色沿用同一份字面值。后果是暗色菜单不再有 50% 黑的大外影，只剩发丝线 + 填充 ——
      与 Codex 暗色的整体做法一致（0.5.7 已证输入卡暗色无外影，0.5.8 已证暗色靠填充分层）。
      原先的 0 4px 16px rgba(0,0,0,.5) 无任何取证。 */
-  --dsw-elevation-soft: var(--dsw-elevation-stroke), 0 8px 28px rgba(0, 0, 0, 0.55);
 }
 
 /* ── 排版层：标题字重 600 封顶 ───────────────────────────────────────────── */
@@ -467,24 +495,27 @@
    codex-ink（墨白终端）· L3 组件层契约
    ----------------------------------------------------------------------------
    治理目标（对应方案 §7）：
-     ① 卡片统一契约：纯描边 + 10px 圆角 + 近零阴影 + 16px padding；
+     ① 卡片统一契约：纯描边 + 12px 圆角（--dsw-radius-m）+ 近零阴影 + 16px padding；
      ② 徽标/chip 统一 mono pill；
      ③ 彩色白名单归一：插件自带调色板收敛到 state 三色 + 墨灰；
      ④ hover = 背景升一档，禁自创投影；
      ⑤ 焦点环、cursor、动效时长三条 a11y/交互底线。
 
-   锚点纪律：只使用 skin-center 语义属性契约
-   （data-dsh-surface / data-dsh-part / data-dsh-plugin / data-slot），
-   不使用 CSS-Modules 哈希类名（[class*=…]），以免触发加载器的
-   "reliance on CSS-Modules hash class names" 警告。
+   锚点纪律：优先使用 skin-center 语义属性契约
+   （data-dsh-surface / data-dsh-part / data-dsh-plugin / data-slot）。
+   宿主没有 data-* 的位置（⑰ 加号与两个触发器）才退到 CSS-Modules 类名的
+   **后缀**写法（方括号 class 属性后缀匹配），只依赖语义后缀、不依赖随构建变化的哈希前缀；
+   哈希全名一律不用。计数由 src/build.mjs 每次构建自报。
    ========================================================================== */
 
-/* ── ① 焦点环：2px Codex 强调蓝 + 2px offset（-—color-border-focus，亮 #339cff / 暗 70%） ─ */html[data-codex-ui] :focus-visible{
-  outline: 2px solid var(--dsw-codex-focus);
+/* ── ① 焦点环：2px Codex 强调蓝 + 2px offset（--color-border-focus，亮 #339cff / 暗 70%）
+   颜色读宿主的 --dsw-focus-ring-color（skin.css 已把它接到 --dsw-codex-focus）：宿主在指针
+   操作时就地把它置成 transparent，读令牌才能继承这条「鼠标点击不出环」的约定。 ── */html[data-codex-ui] :focus-visible{
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: 2px;
 }
 
-/* ── ② 链接 = 墨 + hover 下划线，不着色 ─────────────────────────────────── */html[data-codex-ui] a{
+/* ── ② 链接 = 强调色（--dsw-alias-link）+ hover 下划线 ──────────────────── */html[data-codex-ui] a{
   color: var(--dsw-alias-link);
   text-decoration: none;
   text-underline-offset: 2px;
@@ -493,7 +524,7 @@
   text-decoration: underline;
 }
 
-/* ── ③ 可点击元素：cursor + 100ms 干脆过渡 ──────────────────────────────── */html[data-codex-ui] button,html[data-codex-ui] a,html[data-codex-ui] summary,html[data-codex-ui] [role="button"],html[data-codex-ui] [role="tab"],html[data-codex-ui] [role="menuitem"],html[data-codex-ui] [role="option"]{
+/* ── ③ 可点击元素：cursor + 150ms 干脆过渡（--dsw-motion-fast） ─────────── */html[data-codex-ui] button,html[data-codex-ui] a,html[data-codex-ui] summary,html[data-codex-ui] [role="button"],html[data-codex-ui] [role="tab"],html[data-codex-ui] [role="menuitem"],html[data-codex-ui] [role="option"]{
   cursor: pointer;
 }html[data-codex-ui] button,html[data-codex-ui] a,html[data-codex-ui] summary,html[data-codex-ui] [role="button"],html[data-codex-ui] [role="tab"],html[data-codex-ui] [role="menuitem"]{
   transition:
@@ -515,7 +546,7 @@
   padding: var(--dsw-space-4);
 }
 
-/* 弹层 / 模态：大圆角 + 一点点软影 */html[data-codex-ui] [role="dialog"],html[data-codex-ui] [data-dsh-surface="overlay"] [data-dsh-part="panel"]{
+/* 弹层 / 模态：大圆角（阴影交给宿主的 elevation 令牌，本层不另画） */html[data-codex-ui] [role="dialog"],html[data-codex-ui] [data-dsh-surface="overlay"] [data-dsh-part="panel"]{
   border-radius: var(--dsw-radius-l);
 }
 
@@ -555,13 +586,13 @@
   border-radius: var(--dsw-radius-s);
 }
 
-/* ── ⑧ 输入区：工具不是主角，14px 圆角 + 纯描边 ──────────────────────────
-   卡片（[data-composer-card]）的圆角只在 ⑭ 层（composer.css）声明一处：20px，
-   corner-shape 可用时 25px 超椭圆。旧版这里还写着 var(--dsw-radius-l)=16px，
-   与 ⑭ 层构成同一元素的第二真源，谁生效只看选择器权重 —— 已删。 */html[data-codex-ui] [data-dsh-surface="composer"] [data-dsh-part="composer-input"]{
+/* ── ⑧ 输入区：工具不是主角，16px 圆角（--dsw-radius-l）+ 纯描边 ─────────────
+   卡片（[data-composer-card]）的**圆角与阴影**只在 ⑭ 层（composer.css）声明一处：
+   圆角 20px（corner-shape 可用时 25px 超椭圆），阴影是 Codex --elevation-composer 三层。
+   旧版这里还各写过一次 —— 圆角 var(--dsw-radius-l)=16px、阴影 var(--dsw-elevation-panel) ——
+   与 ⑭ 层构成同一元素的第二真源，谁生效只看选择器权重。两条都已删：宿主只在会话滚动区里
+   渲染这张卡（真 GUI 实测 1 张、且在 [data-conversation-scroll] 内），⑭ 层全覆盖。 */html[data-codex-ui] [data-dsh-surface="composer"] [data-dsh-part="composer-input"]{
   border-radius: var(--dsw-radius-l);
-}html[data-codex-ui] [data-composer-card]{
-  box-shadow: var(--dsw-elevation-panel);
 }html[data-codex-ui] [data-dsh-part="composer-input"]{
   font-family: var(--dsw-font-family);
   line-height: var(--dsw-leading-base);
@@ -597,9 +628,12 @@
      · 触发器 = 宿主原生形态（模型名 + 强度 + chevron），本层不重绘，
        只把焦点环归一成一条细线。旧版藏 chevron、改 mono 字体、压 24px 高，
        实测与仓库截图 conversation-light.png 的触发器不符，全部撤掉。
-     · 菜单面板 = 仓库 composer-tool-menus 的皮肤契约：不透明白 + 大圆角 +
-       软影 0 8px 32px + 1px 描边环；行 28px、内衬 4px 9px、圆角 8px、
+     · 菜单面板 = 仓库 composer-tool-menus 的皮肤契约：不透明白 + 18px 圆角 +
+       软影 0 8px 32px + 1px 描边环；行 28px、内衬 4px 9px、圆角 13px（同心：18 − 内衬 5）、
        hover 淡填充。旧版 TUI 编号行、页脚提示行、隐藏勾选列一并废弃。
+     · 设置卡的「Codex 模型选择器」开着时，这一席位由 model-picker.css 的自建组件顶替，
+       本段只在开关关掉（或组件没挂上）时作用于宿主原生菜单 —— 即 A 面退化路径
+       （B 面组件见 docs/plan-model-picker.zh-CN.md）。
      · 选中行 = 淡填充 + 勾选图标；pending 行 = 行尾 StateDot 转圈。
        旧版把行尾整列 display:none，点强度后转圈被藏、全列表又被全局
        disabled 规则压到 45% 透明度 —— 点了像没反应，这就是「选择推理
@@ -611,7 +645,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── ⑫·1 触发器：只归一焦点环（官方 box-shadow 环 + 全局 2px outline → 1px 细线） ── */html[data-codex-ui] [data-slot="conversation.input.model"] button:focus-visible{
-  outline: 1px solid var(--dsw-codex-focus);
+  outline: 1px solid var(--dsw-focus-ring-color);
   outline-offset: 1px;
   box-shadow: none;
 }
@@ -653,7 +687,7 @@
 }
 
 /* 键盘焦点：全局 2px 环在菜单内不贴行盒，改 1px 内描线 */html[data-codex-ui] body > div[role="menu"][aria-busy] button[role="menuitem"]:focus-visible,html[data-codex-ui] body > div[role="menu"][aria-busy] button[role="menuitemradio"]:focus-visible{
-  outline: 1px solid var(--dsw-codex-focus);
+  outline: 1px solid var(--dsw-focus-ring-color);
   outline-offset: -1px;
   background: var(--dsw-alias-interactive-bg-active);
 }
@@ -741,7 +775,7 @@
    titleRow 的官方布局是 titleCluster（flex:1）+ utilities + corner，
    故去掉旧版的 justify-content:flex-end —— 标题要留在左边。
 
-   ⚠ 本注释块里**不能出现花括号**（左右都不行）：scripts/install-plugin.mjs 的
+   ⚠ 本注释块里**不能出现花括号**（左右都不行）：src/build.mjs 的
    scopeCss 是按「下一个左花括号」做括号配对的，注释里混进一个花括号就会把
    后面的规则整段错位 —— 实测表现为紧随其后的规则被重复加 html[data-codex-ui]
    前缀而失效、整份 theme.css 花括号数不平衡。所以注释里只写行式记法。 */
@@ -755,7 +789,7 @@
    配色不动：条目只用 --dsw-* 语义令牌（--dsw-alias-label-tertiary、--dsw-alias-interactive-bg-hover、
    --dsw-alias-border-l4 …），本皮肤已重锚这些令牌，因此跟着现在的配色走，不需要另配一套色。
    出口恒为 div[data-slot=槽名][style=display:contents]，不需要也不应该改出口本身。
-   ⚠ 本部注释里不能出现花括号（install-plugin.mjs 的 scopeCss 按花括号配对）。 */html[data-codex-ui] [data-slot="conversation.session.header"] > [data-conversation-tabs]{
+   ⚠ 本部注释里不能出现花括号（src/build.mjs 的 scopeCss 按花括号配对）。 */html[data-codex-ui] [data-slot="conversation.session.header"] > [data-conversation-tabs]{
   display: none;
 }
 
@@ -977,12 +1011,402 @@
 
 
 
+/* ==== L3 模型选择器组件（源：skins/codex-ink/model-picker.css）==== */
+/* ============================================================================
+   codex-ink（墨白终端）· L3 模型选择器组件（B 面：功率轨）
+   ----------------------------------------------------------------------------
+   源文件：skins/codex-ink/model-picker.css
+   消费者：src/model-picker.js（自建 DOM，不是宿主的菜单）。
+   由 src/build.mjs 与其余各层一起拼接，并作用域化到 html[data-codex-ui]；
+   本文件写裸选择器，注释里不写花括号（scopeCss 按花括号配对）。
+
+   纪律（0.5.0 卡顿的教训，check-repo 有一条断言守着）：
+     · 本层只画自建节点（.codex-mp-*），外加宿主席位的**一条**隐藏规则；
+     · 一条选择器都不挂宿主的菜单 portal（body 直属的 role=menu），
+       也不改宿主菜单的 display / height / padding。
+
+   取值来源：
+     Codex = app.asar 模型选择器实现块 _Root_xwb5v_19 / _Track_xwb5v_212 /
+             _Tick_xwb5v_40 / _Thumb_xwb5v_12 的逐字值（复刻提示词第六节）；
+     宿主  = dsh-client-ui-model-selection 0.1.7-rc.2 的 ModelSelect.module.css
+             （触发器几何与 z-index 照抄，好让我们的触发器在工具条里与原生那一格同位同高）；
+     本皮肤 = 已有令牌（⑫ 菜单面板契约、⑰ 胶囊、同心圆角）。
+   ============================================================================ */
+
+
+/* ── ① 席位顶替 ─────────────────────────────────────────────────────────
+   我们的触发器在席时，宿主那一格隐藏（仍在 React 树里，生命周期不动）。
+   直接子代 :has() 的失效范围只有席位自己的几个子节点，不是 0.5.0 那种挂在
+   portal 菜单上的长链。触发器一摘（设置里关掉、或组件卸载），宿主那一格立刻复原。 */html[data-codex-ui] [data-slot="conversation.input.model"]:has(> .codex-mp-trigger) > :not(.codex-mp-trigger){
+  display: none;
+}
+
+
+/* ── ② 触发器：模型名 + 档位名 + chevron ─────────────────────────────────
+   几何照宿主 _7KE1Ra_trigger（高 28、内衬 0 4 0 8、gap 4、13px/20px、
+   max-width min(360px, 45cqw)），外观走 ⑰ 的 Codex 胶囊：全圆角、默认透明无描边、
+   悬停或展开才填 --dsw-codex-hover-fill。焦点环由 ⑫·1 的席位规则统一画（1px 细线）。 */html[data-codex-ui] .codex-mp-trigger{
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  min-width: 0;
+  max-width: min(360px, 45cqw);
+  padding: 0 4px 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-pill);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color var(--dsw-motion-fast) var(--dsw-ease);
+}html[data-codex-ui] .codex-mp-trigger:hover,html[data-codex-ui] .codex-mp-trigger[aria-expanded="true"]{
+  background: var(--dsw-codex-hover-fill);
+}html[data-codex-ui] .codex-mp-trigger-model{
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 档位文字叠层（Codex _ModelPickerTriggerEffortText 逐字）：各档名叠在同一格，
+   格宽取最宽的名字；当前那层清晰，其余 opacity 0 + blur(--blur-xs = 4px)。
+   改档因此是模糊交叉淡入，不是换文本，触发器宽度也不跳。 */html[data-codex-ui] .codex-mp-effort-layers{
+  display: grid;
+  grid-template-columns: max-content;
+  flex-shrink: 1000;
+  width: max-content;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+}html[data-codex-ui] .codex-mp-effort-layers[hidden]{
+  display: none;
+}html[data-codex-ui] .codex-mp-effort-text{
+  grid-area: 1 / 1;
+  justify-self: center;
+  opacity: 0;
+  filter: blur(4px);
+  white-space: nowrap;
+  will-change: opacity, filter;
+  transition:
+    opacity var(--dsw-motion-slow) var(--dsw-ease),
+    filter var(--dsw-motion-slow) var(--dsw-ease);
+}html[data-codex-ui] .codex-mp-effort-text[data-active="true"]{
+  opacity: 1;
+  filter: none;
+}
+
+/* chevron：宿主 _7KE1Ra_chevron 的 .12s 翻转 */html[data-codex-ui] .codex-mp-trigger-chevron{
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-label-caption);
+  transition: transform 120ms var(--dsw-ease);
+}html[data-codex-ui] .codex-mp-trigger[aria-expanded="true"] .codex-mp-trigger-chevron{
+  transform: rotate(180deg);
+}
+
+
+/* ── ③ 弹层 ─────────────────────────────────────────────────────────────
+   宽：Codex calc(var(--spacing) * 63.5)，--spacing = 4px ⇒ 254px。
+   入场：Codex .32s cubic-bezier(.23, 1, .32, 1) 30ms both，opacity 0 / scale(.98) → 1；
+         弹层在触发器上方、右沿对齐，所以从右下角长出来。
+   面板：⑫·2 的菜单契约 —— 不透明 layer-1 + 18px 圆角 + 内衬 5px + 0 8px 32px 软影 + 1px 环。
+   z-index / max-height 照宿主 _7KE1Ra_menu。 */html[data-codex-ui] .codex-mp-popover{
+  position: fixed;
+  z-index: 1100;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: calc(4px * 63.5);
+  max-width: calc(100vw - 24px);
+  max-height: min(360px, 100vh - 96px);
+  padding: 5px;
+  border-radius: var(--dsw-radius-menu);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: 0 8px 32px rgba(13, 13, 13, 0.13), 0 0 0 1px rgba(13, 13, 13, 0.04);
+  font-size: 13px;
+  line-height: 20px;
+  transform-origin: bottom right;
+  animation: codex-mp-enter 0.32s cubic-bezier(0.23, 1, 0.32, 1) 30ms both;
+}html[data-codex-ui] body[data-ds-dark-theme] .codex-mp-popover{
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(236, 236, 236, 0.05);
+}html[data-codex-ui] .codex-mp-popover[hidden]{
+  display: none;
+}html[data-codex-ui] .codex-mp-popover[data-reduced-motion="true"]{
+  animation: none;
+}
+
+@keyframes codex-mp-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 提交失败那一条（宿主 _7KE1Ra_error 的底色、字色、11px/16px；圆角按同心取 18 − 5） */html[data-codex-ui] .codex-mp-error{
+  flex: none;
+  margin-bottom: 3px;
+  padding: 6px 9px;
+  border-radius: calc(var(--dsw-radius-menu) - 5px);
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 11px;
+  line-height: 16px;
+}html[data-codex-ui] .codex-mp-error[hidden]{
+  display: none;
+}
+
+
+/* ── ④ 模型列表：行几何同 ⑫·3（28px / 4px 9px / gap 8 / 圆角 18 − 5 = 13） ── */html[data-codex-ui] .codex-mp-list{
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}html[data-codex-ui] .codex-mp-status{
+  padding: 8px 9px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}html[data-codex-ui] .codex-mp-retry{
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 分组标题：宿主 _7KE1Ra_groupTitle 的 11px/16px/500 辅墨；横向内衬对齐行文字的 9px */html[data-codex-ui] .codex-mp-group{
+  padding: 4px 9px 2px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+}html[data-codex-ui] .codex-mp-group:not(:first-child){
+  margin-top: 3px;
+}html[data-codex-ui] .codex-mp-row{
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: calc(var(--dsw-radius-menu) - 5px);
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}html[data-codex-ui] .codex-mp-row:hover,html[data-codex-ui] .codex-mp-row[aria-checked="true"]{
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+/* 键盘焦点：菜单内改 1px 内描线（全局 2px 环不贴行盒） */html[data-codex-ui] .codex-mp-row:focus-visible{
+  outline: 1px solid var(--dsw-focus-ring-color);
+  outline-offset: -1px;
+  background: var(--dsw-alias-interactive-bg-active);
+}html[data-codex-ui] .codex-mp-row[aria-busy="true"]{
+  cursor: progress;
+}html[data-codex-ui] .codex-mp-row-copy{
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}html[data-codex-ui] .codex-mp-row-name{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* 说明：宿主 _7KE1Ra_status 的 12px/18px 辅墨，单行截断（全文在 title 里） */html[data-codex-ui] .codex-mp-row-desc{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}html[data-codex-ui] .codex-mp-row-check{
+  display: grid;
+  flex: 0 0 14px;
+  place-items: center;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* pending 转圈：与 ⑫ 同一副（12px / 1.5px 环 / 顶边前景色 / Codex --animate-spin 1s linear） */html[data-codex-ui] .codex-mp-spinner{
+  box-sizing: border-box;
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--dsw-alias-border-l3);
+  border-top-color: var(--dsw-alias-label-primary);
+  border-radius: 50%;
+  animation: codex-ui-spin 1s linear infinite;
+}
+
+
+/* ── ⑤ 推理等级：标题行 + 功率轨 ─────────────────────────────────────────
+   与列表之间一条 0.5px l1 发丝线（发丝即层级）；标题行与菜单行同高同衬。 */html[data-codex-ui] .codex-mp-effort{
+  flex: none;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+}html[data-codex-ui] .codex-mp-effort[hidden]{
+  display: none;
+}html[data-codex-ui] .codex-mp-effort-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 4px 9px;
+  color: var(--dsw-alias-label-secondary);
+}html[data-codex-ui] .codex-mp-effort-value{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Codex _Container：高 32 / 上下 2 / 左右 6 / 外边 2，纵向居中 */html[data-codex-ui] .codex-mp-container{
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 32px;
+  margin-inline: 2px;
+  padding-block: 2px;
+  padding-inline: 6px;
+}
+
+/* Codex _Root：高 28、整宽、居中；touch-action: none 必须写，否则移动端手势被滚动抢走。
+   动效令牌逐字：主曲线 .3s cubic-bezier(.23, 1, .32, 1)，档位变换 .12s，
+   拇指跟随时长首帧 0s（脚本 16ms 后打 data-armed 抬到 .3s，打开时不从 0 滑过来）。 */html[data-codex-ui] .codex-mp-root{
+  --codex-mp-motion-duration: 0.3s;
+  --codex-mp-motion-easing: cubic-bezier(0.23, 1, 0.32, 1);
+  --codex-mp-tick-transform-duration: 0.12s;
+  --codex-mp-thumb-motion-duration: 0s;
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 28px;
+  outline: none;
+  touch-action: none;
+  cursor: pointer;
+}html[data-codex-ui] .codex-mp-root[data-armed="true"]{
+  --codex-mp-thumb-motion-duration: var(--codex-mp-motion-duration);
+}html[data-codex-ui] .codex-mp-root[data-dragging="true"],html[data-codex-ui] .codex-mp-root[data-dragging="true"] .codex-mp-tick{
+  cursor: grabbing;
+}html[data-codex-ui] .codex-mp-root[data-disabled="true"]{
+  opacity: 0.6;
+}html[data-codex-ui] .codex-mp-popover[data-reduced-motion="true"] .codex-mp-root{
+  --codex-mp-motion-duration: 0s;
+  --codex-mp-tick-transform-duration: 0s;
+  --codex-mp-thumb-motion-duration: 0s;
+}
+
+/* Codex _Track：24px 高、12px 圆角、前景 10% 底、0.5px 内描边（--color-border） */html[data-codex-ui] .codex-mp-track{
+  position: relative;
+  flex-grow: 1;
+  height: 24px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--dsw-codex-border);
+}
+
+/* Codex _Range：强调色，只圆左侧两角，止于拇指中线。
+   位置公式与拇指、圆点同一条：calc(14px + (100% − 28px) × pos)。 */html[data-codex-ui] .codex-mp-range{
+  position: absolute;
+  top: 0;
+  inset-inline-start: 0;
+  width: calc(14px + (100% - 28px) * var(--codex-mp-pos, 0));
+  height: 100%;
+  border-radius: 12px 0 0 12px;
+  background: var(--dsw-alias-link);
+  transition: width var(--codex-mp-thumb-motion-duration) var(--codex-mp-motion-easing);
+}
+
+/* Codex _Tick：4px 圆点，热区 16px（::before 外扩 6px）；走过的 30% 白，没走到的 description 50% */html[data-codex-ui] .codex-mp-tick{
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  color: color-mix(in srgb, var(--dsw-alias-label-tertiary) 50%, transparent);
+  transform: translate(-50%, -50%);
+  transition:
+    transform var(--codex-mp-tick-transform-duration) var(--codex-mp-motion-easing),
+    filter var(--codex-mp-tick-transform-duration) var(--codex-mp-motion-easing);
+}html[data-codex-ui] .codex-mp-tick::before{
+  content: "";
+  position: absolute;
+  inset: -6px;
+}html[data-codex-ui] .codex-mp-tick:hover{
+  filter: brightness(0.85);
+  transform: translate(-50%, -50%) scale(2);
+}html[data-codex-ui] .codex-mp-tick[data-selected="true"]{
+  color: #ffffff4d;
+}
+
+/* Codex _ThumbScale + _Thumb：28px 定位盒 + 白色圆片（0.5px 强描边 + 0 0 2px 10% 微影）。
+   白片亮暗同色，Codex 原样如此。 */html[data-codex-ui] .codex-mp-thumb-scale{
+  position: absolute;
+  top: 50%;
+  left: calc(14px + (100% - 28px) * var(--codex-mp-pos, 0));
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  will-change: left;
+  transition: left var(--codex-mp-thumb-motion-duration) var(--codex-mp-motion-easing);
+}html[data-codex-ui] .codex-mp-thumb{
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: block;
+  border: 0.5px solid var(--dsw-codex-border-strong);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 2px #0000001a;
+}
+
+/* 键盘焦点：Codex outline 2px + offset 0，画在拇指上（不是全局那条 2px + 2px） */html[data-codex-ui] .codex-mp-root[data-keyboard-focused="true"] .codex-mp-thumb-scale{
+  outline: 2px solid var(--dsw-focus-ring-color);
+  outline-offset: 0;
+}
+
+/* 没有生效档（跟随提供方默认）：拇指与色条不画，只剩轨与圆点 */html[data-codex-ui] .codex-mp-root[data-unset] .codex-mp-thumb-scale,html[data-codex-ui] .codex-mp-root[data-unset] .codex-mp-range{
+  visibility: hidden;
+}
+
+
 /* ==== L3 侧栏对齐层（源：skins/codex-ink/sidebar-align.css）==== */
 /* ============================================================================
    codex-ink（墨白终端）· L3 侧栏对齐层
    ----------------------------------------------------------------------------
    源文件：skins/codex-ink/sidebar-align.css
-   由 scripts/install-plugin.mjs 与 skin.css / patches.css 一起拼接，并作用域化到
+   由 src/build.mjs 与 skin.css / patches.css 一起拼接，并作用域化到
    html[data-codex-ui]。因此本文件写「裸选择器」——不要自己再加 html[...] 前缀，
    那会被 scopeCss 判为已作用域而直通，永不命中。
 
@@ -1075,7 +1499,7 @@
 }html[data-codex-ui] div:has([data-slot="sidebar.workspaces"]):not(:has([data-slot="sidebar.toggle.badge"])) > button:hover{
   background: var(--dsw-alias-interactive-bg-hover);
 }html[data-codex-ui] div:has([data-slot="sidebar.workspaces"]):not(:has([data-slot="sidebar.toggle.badge"])) > button:focus-visible{
-  outline: 2px solid var(--dsw-codex-focus);
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: -2px;
 }
 
@@ -1252,13 +1676,13 @@
 /* ============================================================================
    codex-ink · L3 窗口边缘阴影层
    ----------------------------------------------------------------------------
-   源文件：skins/codex-ink/window-shadow.css。install-plugin.mjs 把本文件的选择器
+   源文件：skins/codex-ink/window-shadow.css。src/build.mjs 把本文件的选择器
    作用域化到 html[data-codex-ui] 后拼进 client.js 的内嵌样式表，所以这里写裸选择器：
    自己再加 html[...] 前缀会被 scopeCss 判为已作用域而直通，永远不命中。
    注释里禁止出现花括号 —— scopeCss 按「下一个左花括号」做括号配对。
 
    目标（三条，不多做）：
-     1. 会话窗口（AppFrame 中列）：1px 发丝线 + 24px 全向环境影（左沿糊到侧栏、上沿糊进标题栏条）；
+     1. 会话窗口（AppFrame 中列）：0.5px 发丝线 + 24px 全向环境影（左沿糊到侧栏、上沿糊进标题栏条）；
      2. 右栏面板：同样的顶沿，但**左边框只留发丝线、不带影**；
      3. 右栏分界线拖拽柄悬停时的中段渐变聚焦。
 
@@ -1361,10 +1785,10 @@
    codex-ink（墨白终端）· L3 输入区完整层
    ----------------------------------------------------------------------------
    源文件：skins/codex-ink/composer.css
-   由 scripts/install-plugin.mjs 与其余各层一起拼接，并作用域化到 html[data-codex-ui]。
+   由 src/build.mjs 与其余各层一起拼接，并作用域化到 html[data-codex-ui]。
    本文件写「裸选择器」——不要自己再加 html[...] 前缀，那会被 scopeCss 直通。
 
-   来源（本地克隆：D:\A-part-of-new-software\PROJIECT\dsh-codex-ui）：
+   来源（上游仓库 MichengAI/dsh-codex-ui 的源码；行号是移植时那一版的）：
      · src/client/CodexSidebar.tsx          L119-L137  → ⑭·1 ⑭·2 ⑭·3
      · src/client/composer-tool-menus.ts    L6-L30     → ⑭·4（仅官方锚点部分）
      · src/client/new-conversation-style.ts L3-L14     → ⑭·5
@@ -1507,7 +1931,7 @@
 }html[data-codex-ui] [data-conversation-scroll] [data-composer-card] > [data-input-scroll] + div button[class$=_primary]:hover:not(:disabled){
   background: var(--dsw-alias-label-secondary);
 }html[data-codex-ui] [data-conversation-scroll] [data-composer-card] > [data-input-scroll] + div :is(button, select):focus-visible{
-  outline: 2px solid var(--dsw-codex-focus);
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: 2px;
 }
 
@@ -1671,7 +2095,7 @@
   font-size: 11px;
   letter-spacing: 0.04em;
 }html[data-codex-ui] .cx-hex:focus-visible{
-  outline: 2px solid var(--dsw-codex-focus);
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: 1px;
 }html[data-codex-ui] .cx-text{
   width: 220px;
@@ -1683,7 +2107,7 @@
   color: var(--dsw-alias-label-primary);
   font-size: 12px;
 }html[data-codex-ui] .cx-text:focus-visible{
-  outline: 2px solid var(--dsw-codex-focus);
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: 1px;
 }html[data-codex-ui] .cx-range{
   width: 160px;
@@ -1701,7 +2125,9 @@
   line-height: 16px;
 }html[data-codex-ui] .cx-error{
   margin: 8px 0 0;
-  color: var(--dsw-alias-state-error, var(--dsw-alias-label-primary));
+  /* 旧值读的是 --dsw-alias-state-error —— 这个令牌宿主与本皮肤都没有，于是永远落到回退的
+     主文本色，「保存没生效」的提示看起来跟普通说明一样。改读真实存在的 error-primary。 */
+  color: var(--dsw-alias-state-error-primary);
   font-size: 11px;
   line-height: 16px;
 }

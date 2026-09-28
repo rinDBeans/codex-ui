@@ -2,7 +2,7 @@
    codex-ink（墨白终端）· L3 侧栏对齐层
    ----------------------------------------------------------------------------
    源文件：skins/codex-ink/sidebar-align.css
-   由 scripts/install-plugin.mjs 与 skin.css / patches.css 一起拼接，并作用域化到
+   由 src/build.mjs 与 skin.css / patches.css 一起拼接，并作用域化到
    html[data-codex-ui]。因此本文件写「裸选择器」——不要自己再加 html[...] 前缀，
    那会被 scopeCss 判为已作用域而直通，永不命中。
 
@@ -101,7 +101,7 @@ div:has([data-slot="sidebar.workspaces"]):not(:has([data-slot="sidebar.toggle.ba
 }
 
 div:has([data-slot="sidebar.workspaces"]):not(:has([data-slot="sidebar.toggle.badge"])) > button:focus-visible {
-  outline: 2px solid var(--dsw-codex-focus);
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: -2px;
 }
 

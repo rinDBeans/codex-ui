@@ -40,6 +40,8 @@ const CHROME = arg('chrome', '') || chromePath();
 const PORT = Number(arg('cdp-port', '9340'));
 /* 设备像素比：默认 2；对 Windows 桌面壳做发丝线粗细对账时用 1.5（与实机 device-scale-factor 一致）。 */
 const DPR = Number(arg('dpr', '2'));
+/* A 面 pending 阶段给模型往返加的时延（ms）：本机往返 <60ms，采不到窗口；0 = 不加。 */
+const LATENCY = Number(arg('latency', '800'));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 if (!TOKEN_URL) { console.error('缺少 --url "http://127.0.0.1:<port>/?token=..."'); process.exit(2); }
 
@@ -94,6 +96,17 @@ await sleep(12000);
 await evaluate('document.documentElement.setAttribute("data-windows-titlebar","");document.documentElement.setAttribute("data-platform","win32");'
   + 'document.documentElement.style.setProperty("--dsh-windows-titlebar-height","40px");', sessionId);
 await sleep(1000);
+/* 新 profile（没配 API Key、没点过内测声明）一进来就是两层引导弹层，后面的点击全落在遮罩上 ——
+   右栏打不开、模型菜单点不到，结果是三条右栏断言「实测 none」。与 settings-page-verify 同一套关法。 */
+for (let round = 0; round < 5; round += 1) {
+  const dismiss = await evaluate('(() => { const re = /^(继续|稍后配置|跳过|知道了|Continue|Later|Skip)$/;'
+    + 'const b = [...document.querySelectorAll("button")].find((e) => re.test(e.textContent.trim()) && e.offsetParent !== null);'
+    + 'if (!b) return null; const r = b.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), text: b.textContent.trim() }; })()', sessionId);
+  if (dismiss === null) break;
+  await click(dismiss.x, dismiss.y, sessionId);
+  await sleep(1200);
+  console.log('DISMISS ' + dismiss.text);
+}
 
 const FRAME = '(() => {'
   + 'const cs = (el, p) => (el ? getComputedStyle(el, p) : null);'
@@ -142,13 +155,61 @@ const SLOT_BTN = '([...document.querySelectorAll("[data-slot]")]'
 let trigger = null;
 /** pending 窗口内逐帧快照，供末尾断言。 */
 let pendingSnaps = [];
-for (let i = 0; i < 20 && !trigger; i += 1) {
+/** B 面（自建选择器）量到的结果；A 面（宿主菜单）时为 null。 */
+let bFace = null;
+/* 「Codex 模型选择器」开着（默认）时席位由自建组件顶替，宿主菜单根本不会出现 ——
+   这时量 B 面：顶替、弹层几何、拇指落点，再用键盘真改一档、看宿主自己的 store 是否跟着变，最后改回去。
+   pending 转圈的时序在本机往返（<60ms）里采不到，那一段由 power-rail-verify.mjs 的慢往返夹具覆盖。 */
+for (let i = 0; i < 10 && bFace === null; i += 1) {
+  const has = await evaluate('!!document.querySelector("[data-slot=\\"conversation.input.model\\"] > .codex-mp-trigger")', sessionId);
+  if (has) bFace = {};
+  else if (await evaluate('!!document.querySelector("[data-slot=\\"conversation.input.model\\"]")', sessionId)) break;
+  else await sleep(1000);
+}
+if (bFace !== null) {
+  const HOST_TITLE = '(() => { const b = document.querySelector("[data-slot=\\"conversation.input.model\\"] ._7KE1Ra_trigger, [data-slot=\\"conversation.input.model\\"] > :not(.codex-mp-trigger) button"); return b ? b.title : null; })()';
+  const MINE = '(() => { const slot = document.querySelector("[data-slot=\\"conversation.input.model\\"]"); const mine = slot.querySelector(":scope > .codex-mp-trigger");'
+    + 'const r = mine.getBoundingClientRect(); const others = [...slot.children].filter((c) => c !== mine);'
+    + 'return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), h: r.height, title: mine.title,'
+    + '  hostHidden: others.length > 0 && others.every((c) => getComputedStyle(c).display === "none") }; })()';
+  const mine = await evaluate(MINE, sessionId);
+  bFace.seat = mine;
+  await click(mine.x, mine.y, sessionId);
+  await sleep(900);
+  bFace.open = await evaluate('(() => { const p = document.querySelector(".codex-mp-popover"); const root = p && p.querySelector(".codex-mp-root");'
+    + 'if (!p || p.hidden) return null; const pr = p.getBoundingClientRect(); const rr = root.getBoundingClientRect();'
+    + 'const ticks = [...root.querySelectorAll(".codex-mp-tick")].map((t) => { const b = t.getBoundingClientRect(); return b.left + b.width / 2 - rr.left; });'
+    + 'const th = root.querySelector(".codex-mp-thumb-scale").getBoundingClientRect();'
+    + 'return { w: pr.width, rows: p.querySelectorAll(".codex-mp-row").length, ticks, now: Number(root.getAttribute("aria-valuenow")), thumb: th.left + th.width / 2 - rr.left, railH: rr.height }; })()', sessionId);
+  console.log('B-FACE ' + JSON.stringify({ seat: bFace.seat, open: bFace.open }));
+  if (bFace.open !== null && bFace.open.ticks.length >= 2) {
+    const before = await evaluate(HOST_TITLE, sessionId);
+    const dir = bFace.open.now > 0 ? ['ArrowLeft', 37, 'ArrowRight', 39] : ['ArrowRight', 39, 'ArrowLeft', 37];
+    await evaluate('document.querySelector(".codex-mp-root").focus()', sessionId);
+    const press = async (k, code) => {
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: code }, sessionId);
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: code }, sessionId);
+    };
+    await press(dir[0], dir[1]);
+    await sleep(1500);
+    bFace.changed = { before, after: await evaluate(HOST_TITLE, sessionId), mine: await evaluate('document.querySelector(".codex-mp-trigger").title', sessionId),
+      rows: await evaluate('document.querySelectorAll(".codex-mp-row").length', sessionId) };
+    await press(dir[2], dir[3]);
+    await sleep(1500);
+    bFace.restored = await evaluate(HOST_TITLE, sessionId);
+    console.log('B-FACE 改档 ' + JSON.stringify(bFace.changed) + ' 复原 ' + bFace.restored);
+  }
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId);
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId);
+  await sleep(300);
+}
+for (let i = 0; i < 20 && !trigger && bFace === null; i += 1) {
   trigger = await evaluate('(() => { const b = ' + SLOT_BTN + '; if (!b) return null;'
     + 'const r = b.getBoundingClientRect(); if (!r.width) return null;'
     + 'return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), text: b.textContent }; })()', sessionId);
   if (!trigger) await sleep(1000);
 }
-if (!trigger) console.log('SKIP 模型菜单：composer 的 conversation.input.model 槽没出现（会话未就绪）');
+if (!trigger && bFace === null) console.log('SKIP 模型菜单：composer 的 conversation.input.model 槽没出现（会话未就绪）');
 if (trigger) {
   await click(trigger.x, trigger.y, sessionId);
   await sleep(900);
@@ -170,6 +231,9 @@ if (trigger) {
       const box = await evaluate('(() => { const b = [...document.querySelectorAll("body > div[role=menu] button[role=menuitemradio]")]'
         + '.find(x => x.textContent.trim() === ' + JSON.stringify(pick.text) + '); const r = b.getBoundingClientRect();'
         + 'return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()', sessionId);
+      /* 本机往返不到 60ms，pending 窗口在第一次采样前就结束了 —— 用 CDP 给这一次往返加时延，
+         把它拉回真实机器上的量级（实测 ~1.1s），不然三条 pending 断言量的是空气。 */
+      if (LATENCY > 0) await send('Network.emulateNetworkConditions', { offline: false, latency: LATENCY, downloadThroughput: -1, uploadThroughput: -1 }, sessionId);
       await evaluate('window.__t0 = performance.now()', sessionId);
       await click(box.x, box.y, sessionId);
       pendingSnaps = [];
@@ -194,6 +258,24 @@ if (trigger) {
         pendingSnaps.push(snap);
         console.log('PENDING ' + JSON.stringify(snap));
         if (!snap.menu) break;
+      }
+      if (LATENCY > 0) await send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 }, sessionId);
+      /* 改回原档：探针不留现场。 */
+      const original = options.find((o) => o.checked);
+      await sleep(Math.max(1500, LATENCY * 2));
+      if (original) {
+        const reopen = await evaluate('(() => { const b = ' + SLOT_BTN + '; if (!b) return null; const r = b.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()', sessionId);
+        if (reopen !== null) {
+          await click(reopen.x, reopen.y, sessionId);
+          await sleep(700);
+          const cell2 = await evaluate('(() => { const m = document.querySelector("body > div[role=menu]"); const b = m && [...m.querySelectorAll("button")].find(x => /推理|Reasoning/.test(x.textContent)); if (!b) return null; const r = b.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()', sessionId);
+          if (cell2 !== null) {
+            await click(cell2.x, cell2.y, sessionId);
+            await sleep(600);
+            const back = await evaluate('(() => { const b = [...document.querySelectorAll("body > div[role=menu] button[role=menuitemradio]")].find(x => x.textContent.trim() === ' + JSON.stringify(original.text) + '); if (!b) return null; const r = b.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()', sessionId);
+            if (back !== null) { await click(back.x, back.y, sessionId); await sleep(1200); console.log('RESTORE 推理档位改回 ' + original.text); }
+          }
+        }
       }
     }
   }
@@ -221,10 +303,24 @@ if (pendingSnaps.length > 0) {
   expect('pending 窗口内整列 disabled', pendingSnaps.some((x) => x.disabled >= 2), JSON.stringify(pendingSnaps.map((x) => x.disabled)));
   expect('pending 转圈在跑', pendingSnaps.some((x) => /codex-ui-spin/.test(x.spinner)), JSON.stringify(pendingSnaps.map((x) => x.spinner)));
 }
+if (bFace !== null) {
+  expect('B 面：自建触发器在席、宿主那一格隐藏', bFace.seat.hostHidden === true && Math.round(bFace.seat.h) === 28, JSON.stringify(bFace.seat));
+  expect('B 面：弹层 254px、有模型行', bFace.open !== null && Math.round(bFace.open.w) === 254 && bFace.open.rows >= 1, JSON.stringify(bFace.open));
+  if (bFace.open !== null && bFace.open.ticks.length >= 2) {
+    const t = bFace.open.ticks;
+    const step = (t.at(-1) - t[0]) / (t.length - 1);
+    expect('B 面：档位等距、首档在 14px', Math.abs(t[0] - 14) <= 1 && t.every((x, i) => Math.abs(x - (t[0] + step * i)) <= 1), JSON.stringify(t));
+    expect('B 面：拇指落在生效档上', Math.abs(bFace.open.thumb - t[bFace.open.now]) <= 1, bFace.open.thumb + ' vs ' + t[bFace.open.now]);
+    expect('B 面：键盘改档写进宿主的 store（宿主自己的触发器标题跟着变）', bFace.changed.after !== null && bFace.changed.after !== bFace.changed.before && bFace.changed.mine === bFace.changed.after, JSON.stringify(bFace.changed));
+    expect('B 面：改档往返中列表不清空', bFace.changed.rows === bFace.open.rows, bFace.changed.rows + ' / ' + bFace.open.rows);
+    expect('B 面：改回原档（探针不留现场）', bFace.restored === bFace.changed.before, bFace.restored + ' / ' + bFace.changed.before);
+  }
+}
 fs.mkdirSync(dirname(OUT), { recursive: true });
 const shot = await send('Page.captureScreenshot', { format: 'png' }, sessionId);
 fs.writeFileSync(OUT, Buffer.from(shot.data, 'base64'));
 console.log('SHOT ' + OUT);
 ws.close(); child.kill();
-console.log('\n' + (failed === 0 ? 'RESULT PASS' : 'RESULT FAIL ' + failed) + (pendingSnaps.length === 0 ? '（模型菜单阶段未量到，见上面的 SKIP）' : ''));
+console.log('\n' + (failed === 0 ? 'RESULT PASS' : 'RESULT FAIL ' + failed)
+  + (bFace !== null ? '（模型位：B 面自建选择器）' : pendingSnaps.length === 0 ? '（模型菜单阶段未量到，见上面的 SKIP）' : '（模型位：A 面宿主菜单）'));
 process.exit(failed === 0 ? 0 : 1);

@@ -5,11 +5,11 @@
 
 ## 0. 证据怎么来的
 
-三份输入：Codex 桌面应用的 webview 产物（`D:\codex-ref\codex-app*.css`、`codex-theme-generated.css`、
-`app-*.js` 提取件）、Codex 公开仓库（`D:\codex-src-tmp`，Rust CLI/TUI + app-server，**不含**桌面界面）、
+三份输入：Codex 桌面应用的 webview 产物（`<codex-ref>/codex-app*.css`、`codex-theme-generated.css`、
+`app-*.js` 提取件）、Codex 公开仓库（`<openai-codex 克隆>`，Rust CLI/TUI + app-server，**不含**桌面界面）、
 宿主 DSH `0.1.7-rc.2` 的 `app.asar`（`dsh-client-ui-*` 共 52 个包的 shipped JS/CSS）。
 
-三条可复跑的对账命令（脚本在 `D:\codex-ref\`，临时候选，见 §4.2）：
+三条可复跑的对账命令（脚本在 `<codex-ref>/`，临时候选，见 §4.2）：
 
 | 脚本 | 回答什么 |
 |---|---|
@@ -30,7 +30,7 @@
 | # | 项 | 证据 | 结论 |
 |---|---|---|---|
 | 1.1 | ~~键盘焦点环是两套~~ → **已证伪并清除** | 宿主在 50 个 `client.js` 里有 **108 条 class 级 `:focus-visible` 规则**（162 个类，28 个包），特异性 (0,2,0)，用 `var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary))`；但皮肤 ① 是**属性作用域**规则，特异性更高 | **实测（真 GUI）**：`button._brand` 强制 `:focus-visible` 后 = `rgb(51,156,255) 2px solid offset 2px`；就地注入一条与宿主逐字相同的 class 级规则，颜色**不变**（仍蓝）→ 皮肤赢，全场统一，不需要动 |
-| 1.1b | 残留：10 条用 `box-shadow: inset` 画环的规则**不吃皮肤 ①** | 108 条里有 **10 条**是 box-shadow（deliverables / model-selection / permission-presets / schedule / settings-models / settings-plugin-inventory / trajectory）；`--dsw-focus-ring-color` 未定义 → 落回 fallback = 我们重锚的墨色 | 这些组件聚焦时会「墨色内环 + 蓝色外框」同时出现。**1 条声明**可消除（把 `--dsw-focus-ring-color` 定义成 `var(--dsw-codex-focus)`），属可选打磨 |
+| 1.1b | ~~残留：10 条用 `box-shadow: inset` 画环的规则**不吃皮肤 ①**~~ → **0.6.0 已做**：`skin.css` 声明 `--dsw-focus-ring-color: var(--dsw-codex-focus)`，皮肤自己的环也改读它（顺带继承宿主「指针操作不出环」的约定） | 108 条里有 **10 条**是 box-shadow（deliverables / model-selection / permission-presets / schedule / settings-models / settings-plugin-inventory / trajectory）；`--dsw-focus-ring-color` 未定义 → 落回 fallback = 我们重锚的墨色 | 这些组件聚焦时会「墨色内环 + 蓝色外框」同时出现。**1 条声明**可消除（把 `--dsw-focus-ring-color` 定义成 `var(--dsw-codex-focus)`），属可选打磨 |
 | 1.2 | **圆角家族错位**（陷阱，不是外观问题） | 宿主消费 `-sm` 101、`-md` 74、`-lg` 63、`-xs` 19、`-xl` 24、`-panel` 6；皮肤的 `-s/-m/-l` 在宿主里是 0 消费者，值恰好相同(8/12/16) | 改 `--dsw-radius-m` 不会动宿主任何组件。要么重锚 4 个长名，要么写进 README 当纪律 |
 | 1.3 | `--dsw-motion-*` / `--dsw-ease` 是**我们自造的刻度** | 宿主 `--dsw-motion-*`、`--dsw-duration-*`、`--dsw-ease` 消费数均为 **0** | 无害，但别误读成「宿主动效开关」；动效实际靠 ⑬·7 的选择器覆盖 |
 | 1.4 | 直接指向原语的语义令牌（**候选，待定点实测**） | `--dsw-alias-menu-icon`(暗) ← `--dsw-static-neutral-bluish-800`；`--dsw-alias-bg-document-preview` ← `bluish-100/950`；`--dsw-alias-label-document-preview` ← `bluish-700/300`；`--dsw-alias-onboarding-accent: #3964fe`；`--dsw-alias-toast-label`、`--dsw-alias-tooltip-key-bg` | 「指向原语」是确凿的；「真渲染里露蓝」**本轮没取到点**：探针在 light 模式下读到 `--dsw-alias-bg-document-preview = #43454a`（一个暗色值）而 `--dsw-alias-menu-icon` 读不到，说明这些令牌的声明作用域不是 body。补一次定点取样再决定动不动 |
@@ -131,8 +131,8 @@ node scripts/build.mjs && node scripts/make-verify-profile.mjs
 $env:DSH_HOME = "$env:TEMP\codex-ui-verify-home"
 node scripts/install-plugin.mjs --profile verify --write
 dsh --profile verify --port 3098 --no-open      # 终端会打印带 token 的 URL
-node D:\codex-ref\focus-ring-probe.mjs     --url "<URL>" --chrome "<Chromium>" --dialog
-node D:\codex-ref\focus-mimic-probe.mjs   --url "<URL>" --chrome "<Chromium>"
+node <codex-ref>/focus-ring-probe.mjs     --url "<URL>" --chrome "<Chromium>" --dialog
+node <codex-ref>/focus-mimic-probe.mjs   --url "<URL>" --chrome "<Chromium>"
 ```
 
 读到的原文：

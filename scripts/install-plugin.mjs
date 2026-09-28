@@ -72,6 +72,27 @@ function addToBundles(text) {
   JSON.parse(next); /* 兜底：写坏 JSON 就当场抛，别落盘 */
   return next;
 }
+/**
+ * 往 profile 的 cordis.patch.yml 追加一个块式（`- insert:`）列表项。
+ *
+ * dsh 0.1.7-rc.2 新建 profile 时写进去的是**流式空列表** `[]`（前面三行注释）。
+ * 直接在它后面接 `- insert:` 会得到「流式节点 + 块式序列」两个顶层节点，YAML 解析失败，
+ * `dsh web` 在 boot 阶段就抛 `failed to parse overlay ... cordis.patch.yml`，整个实例起不来。
+ * 所以：空的 `[]` 先摘掉再追加；非空的流式列表无法安全续写，直接拒绝，让人手动改。
+ * @param text - 原文。
+ * @param block - 以换行开头的块式列表项文本。
+ * @returns 新文本。
+ */
+function appendBlockList(text, block) {
+  const lines = text.split(/\r?\n/);
+  const content = lines.filter((line) => line.trim() !== '' && !line.trim().startsWith('#'));
+  if (content.some((line) => line.trim().startsWith('[') && !/^\[\s*\]$/.test(line.trim()))) {
+    throw new Error(PATCH + ' 是非空的流式列表（[...]），无法安全追加块式条目；请改成块式 `- ` 列表后重跑。');
+  }
+  const kept = lines.filter((line) => !/^\s*\[\s*\]\s*$/.test(line));
+  return kept.join(text.includes('\r\n') ? '\r\n' : '\n').replace(/\s*$/, '') + block;
+}
+
 if (wantBundle) {
   if (!write) {
     console.log('BUNDLE  : 计划把 codex-ui 写进 dsh.profile.bundles（--write 才落盘）');
@@ -206,7 +227,7 @@ if (!registered) {
       "      name: 'codex-ui'",
       '',
     ].join('\n');
-    fs.writeFileSync(PATCH, fs.readFileSync(PATCH, 'utf8').replace(/\s*$/, '') + block);
+    fs.writeFileSync(PATCH, appendBlockList(fs.readFileSync(PATCH, 'utf8'), block));
     console.log('APPENDED patch entry 到 cordis.patch.yml');
   }
 } else if (inBundles) {

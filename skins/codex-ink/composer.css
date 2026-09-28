@@ -2,10 +2,10 @@
    codex-ink（墨白终端）· L3 输入区完整层
    ----------------------------------------------------------------------------
    源文件：skins/codex-ink/composer.css
-   由 scripts/install-plugin.mjs 与其余各层一起拼接，并作用域化到 html[data-codex-ui]。
+   由 src/build.mjs 与其余各层一起拼接，并作用域化到 html[data-codex-ui]。
    本文件写「裸选择器」——不要自己再加 html[...] 前缀，那会被 scopeCss 直通。
 
-   来源（本地克隆：D:\A-part-of-new-software\PROJIECT\dsh-codex-ui）：
+   来源（上游仓库 MichengAI/dsh-codex-ui 的源码；行号是移植时那一版的）：
      · src/client/CodexSidebar.tsx          L119-L137  → ⑭·1 ⑭·2 ⑭·3
      · src/client/composer-tool-menus.ts    L6-L30     → ⑭·4（仅官方锚点部分）
      · src/client/new-conversation-style.ts L3-L14     → ⑭·5
@@ -173,7 +173,7 @@ body[data-ds-dark-theme] [data-conversation-scroll] {
 }
 
 [data-conversation-scroll] [data-composer-card] > [data-input-scroll] + div :is(button, select):focus-visible {
-  outline: 2px solid var(--dsw-codex-focus);
+  outline: 2px solid var(--dsw-focus-ring-color);
   outline-offset: 2px;
 }
 

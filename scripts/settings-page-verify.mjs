@@ -212,7 +212,7 @@ const shape = JSON.parse(await evaluate('(() => {'
   + '  link: getComputedStyle(document.documentElement).getPropertyValue("--dsw-alias-link").trim(),'
   + '}); })()', sessionId));
 check('组合包页上有配置卡', shape.form === 1, JSON.stringify(shape));
-check('八行：主题/强调色/背景/前景/UI 字体/代码字体/半透明侧边栏/对比度', shape.rows === 8 && shape.labels.length === 8, JSON.stringify(shape.labels));
+check('九行：主题/强调色/背景/前景/UI 字体/代码字体/半透明侧边栏/Codex 模型选择器/对比度', shape.rows === 9 && shape.labels.length === 9, JSON.stringify(shape.labels));
 check('默认值下不产生覆盖（无 data-codex-ui-theme）', shape.overrideAttr === false, 'attr=' + shape.overrideAttr);
 /* 读 body 上的生效值：深色的链接默认是 #0169cc，与亮色不同，读 html 会永远看到亮色那一份。 */
 const bodyLink = await evaluate('getComputedStyle(document.body).getPropertyValue("--dsw-alias-link").trim()', sessionId);
@@ -249,6 +249,14 @@ if (hexBox !== null) {
   check('该行显示「已覆盖」徽标', marked === true, 'marked=' + marked);
   await shot(OUT.replace(/\.png$/, '-accent.png'));
 }
+
+/* 关掉「Codex 模型选择器」：刷新后在首页量宿主那一格是否复原（组合包页上没有输入区可量）。 */
+const pickerSwitch = () => evaluate('(() => { const el = document.querySelector("[aria-label=\\"Codex 模型选择器\\"]"); return el === null ? null : (el.getAttribute("aria-checked") ?? String(el.checked)); })()', sessionId);
+check('模型选择器开关默认开着', (await pickerSwitch()) === 'true', 'checked=' + (await pickerSwitch()));
+const pickerOff = await clickByLabel('Codex 模型选择器');
+check('找到模型选择器开关', pickerOff !== null, JSON.stringify(pickerOff));
+await sleep(1500);
+check('开关写入后显示为关', (await pickerSwitch()) === 'false', 'checked=' + (await pickerSwitch()));
 
 /* ── 主题那一行：写的是宿主主题偏好，整个应用一起变 ───────────────────── */
 /** 读分段控件当前选中的那一段文本。 */
@@ -287,9 +295,10 @@ if (toDark !== null) {
   };
   console.log('THEME 切到深色 ' + JSON.stringify(dark));
   check('切深色后整个应用进了深色（body[data-ds-dark-theme]）', dark.dark === true, JSON.stringify(dark));
-  check('深色底色生效 #181818', String(dark.base).toLowerCase() === '#181818', 'base=' + dark.base);
+  /* 深色窗口背景自 0.5.6 起是 #111111（#181818 是表面/侧栏那一层）。 */
+  check('深色底色生效 #111111', String(dark.base).toLowerCase() === '#111111', 'base=' + dark.base);
   check('分段显示深色', dark.segment === '深色', 'segment=' + dark.segment);
-  check('下面三行改为编辑深色那一套（背景色块 = #181818）', String(dark.swatch).toLowerCase() === '#181818', 'swatch=' + dark.swatch);
+  check('下面三行改为编辑深色那一套（背景色块 = #111111）', String(dark.swatch).toLowerCase() === '#111111', 'swatch=' + dark.swatch);
   await shot(OUT.replace(/\.png$/, '-dark.png'));
 }
 
@@ -308,6 +317,10 @@ check('刷新后皮肤仍生效', afterReload.skin === true, JSON.stringify(afte
 check('刷新后覆盖仍在（强调色 #ff0000）', afterReload.link.toLowerCase() === '#ff0000', 'link=' + afterReload.link);
 check('刷新后侧栏半透明仍在', afterReload.sidebar.replace(/\s/g, '') === 'rgba(255,255,255,0.72)', 'sidebar=' + afterReload.sidebar);
 check('刷新后主题仍是深色（写的是宿主偏好，不是页面状态）', await evaluate('document.body.hasAttribute("data-ds-dark-theme")', sessionId) === true, JSON.stringify(afterReload));
+const seatOff = JSON.parse(await evaluate('(() => { const slot = document.querySelector("[data-slot=\\"conversation.input.model\\"]");'
+  + 'return JSON.stringify({ slot: slot !== null, ours: document.querySelectorAll(".codex-mp-trigger").length,'
+  + '  host: slot === null ? null : [...slot.children].filter((c) => getComputedStyle(c).display !== "none").length }); })()', sessionId));
+check('选择器关着：席位里没有自建触发器、宿主那一格可见', seatOff.slot === true && seatOff.ours === 0 && seatOff.host >= 1, JSON.stringify(seatOff));
 
 /* 收工把主题还给亮色：刷新后已经在首页，先走回组合包页，别留下深色现场。 */
 const onCard = async () => (await evaluate('document.querySelectorAll(".cx-form").length', sessionId)) > 0;
@@ -320,6 +333,12 @@ if (!(await onCard())) {
 }
 const toLight = await clickByText('^亮色$', sessionId);
 if (toLight !== null) { await click(toLight.x, toLight.y, sessionId); await sleep(1500); }
+/* 模型选择器开关还原：清掉用户层那一格（点这一行的「重置」），回到默认开。 */
+const pickerReset = await evaluate('(() => { const row = [...document.querySelectorAll(".cx-row")].find((r) => (r.querySelector(".cx-row__label") || {}).textContent?.includes("Codex 模型选择器"));'
+  + 'const b = row === undefined ? null : [...row.querySelectorAll("button")].find((x) => x.textContent.trim() === "重置");'
+  + 'if (!b) return null; const r = b.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()', sessionId);
+if (pickerReset !== null) { await click(pickerReset.x, pickerReset.y, sessionId); await sleep(1200); }
+check('收工复位：模型选择器回到默认开', (await pickerSwitch()) === 'true', 'checked=' + (await pickerSwitch()));
 const restored = { segment: await selectedSegment(), base: await bodyVar('--dsw-alias-bg-base') };
 console.log('THEME 复位 ' + JSON.stringify(restored));
 check('收工复位回亮色', String(restored.base).toLowerCase() === '#ffffff' && restored.segment === '亮色', JSON.stringify(restored));

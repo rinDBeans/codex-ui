@@ -15,6 +15,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build, ATTR, PLUGIN_DIR, SKIN_DIR, OVERRIDE_FILE, SETTINGS_FILE, stripExports } from '../src/build.mjs';
 import * as override from '../src/override.js';
+import * as picker from '../src/model-picker.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 let failed = 0;
@@ -131,7 +132,7 @@ const configFields = (() => {
 /** 卡片与覆盖层用到的字段名（写死的期望表，改一处忘另一处会在这里断）。 */
 const EXPECTED_FIELDS = [
   'accentLight', 'accentDark', 'surfaceLight', 'surfaceDark', 'inkLight', 'inkDark',
-  'fontUi', 'fontCode', 'translucentSidebar', 'contrastLight', 'contrastDark',
+  'fontUi', 'fontCode', 'translucentSidebar', 'modelPicker', 'contrastLight', 'contrastDark',
 ];
 check('Config 的 ' + EXPECTED_FIELDS.length + ' 个字段齐全且都是 volatile', () => {
   const names = configFields.map((f) => f.name);
@@ -142,14 +143,18 @@ check('Config 的 ' + EXPECTED_FIELDS.length + ' 个字段齐全且都是 volati
 });
 check('覆盖层：默认值不产生任何 CSS', () => {
   assert(override.themeOverrideCss({}) === '', '空值下输出了 CSS，装上就会改外观');
-  assert(override.themeOverrideCss({ translucentSidebar: false, contrastLight: 45, contrastDark: 60 }) === '', '默认档位下输出了 CSS');
+  assert(override.themeOverrideCss({ translucentSidebar: false, modelPicker: true, contrastLight: 45, contrastDark: 60 }) === '', '默认档位下输出了 CSS');
   return '空串';
 });
 check('覆盖层：色值与字体栈校验', () => {
   assert(override.isHex('#339cff') && override.isHex('#ABCDEF'), '合法十六进制被拒');
   for (const bad of ['339cff', '#339c', '#339cfff', 'red', '', ' #339cff; }', null, undefined]) assert(!override.isHex(bad), '非法色值被接受：' + String(bad));
   assert(override.isFontStack('"Segoe UI", sans-serif'), '合法字体栈被拒');
-  for (const bad of ['', 'a;}', 'url(x)', 'a'.repeat(300), 'x<y']) assert(!override.isFontStack(bad), '非法字体栈被接受：' + String(bad).slice(0, 20));
+  for (const bad of ['', 'a;}', 'url(x)', 'a'.repeat(300), 'x<y', 'u\\72l(x)', 'Arial /*', 'Arial */', '"Segoe UI', 'Arial\nx']) {
+    assert(!override.isFontStack(bad), '非法字体栈被接受：' + JSON.stringify(String(bad).slice(0, 20)));
+  }
+  /* 一条开注释的值若漏过校验，深色那一整块覆盖会被吞掉 —— 直接对产物断言。 */
+  assert(override.themeOverrideCss({ fontUi: 'Arial /*', accentDark: '#123456' }).includes('#123456'), '注释起始混进字体栈后吞掉了深色覆盖块');
   return 'ok';
 });
 check('覆盖层：对比度在默认档位是恒等变换', () => {
@@ -195,6 +200,15 @@ check('覆盖层与皮肤对账：文本档位与 alpha 阶梯逐条一致', () 
       if (found !== rgb + ',' + alpha) drift.push(theme + ' ' + token + ' 期望 rgba(' + rgb + ',' + alpha + ') 实为 ' + rgba(block, token));
     }
   }
+  /* 设置卡色块显示的「跟随皮肤」默认值，也必须就是皮肤里那一支（0.5.6 改了深色底，这里漏改过一次）。 */
+  const roles = { accent: '--dsw-alias-link', surface: '--dsw-alias-bg-base', ink: '--dsw-alias-label-primary', sidebar: '--dsw-alias-bg-sidebar' };
+  for (const theme of ['light', 'dark']) {
+    for (const [role, token] of Object.entries(roles)) {
+      const found = hex(skinBlocks[theme], token);
+      const want = override.SKIN_DEFAULTS[theme][role].toLowerCase();
+      if (found !== want) drift.push(theme + ' SKIN_DEFAULTS.' + role + ' = ' + want + '，skin.css ' + token + ' = ' + found);
+    }
+  }
   assert(drift.length === 0, drift.join('\n     '));
   const count = Object.keys(override.LABEL_TIERS.light).length + Object.keys(override.LABEL_TIERS.dark).length
     + Object.keys(override.ALPHA_LADDER.light).length + Object.keys(override.ALPHA_LADDER.dark).length;
@@ -210,6 +224,60 @@ check('产物里确实带上了设置页与覆盖层', () => {
   const card = fs.readFileSync(SETTINGS_FILE, 'utf8');
   assert(!/jsxs\('[a-z]+', \{[^}]*\}, \[/.test(card) && !/jsxs\('[a-z]+', \{ className: '[^']*', key \}, \[/.test(card), 'settings-card.js 又把 children 传成了第三个参数（jsx 运行时那里是 key）');
   return 'client.js ' + clientJs.length + ' B';
+});
+
+/* ── 6c. 模型选择器（纯函数 + 样式纪律）────────────────────────────────── */
+check('功率轨几何：对齐、比例与像素公式互逆', () => {
+  assert(picker.snapIndex(0, 4) === 0 && picker.snapIndex(1, 4) === 3 && picker.snapIndex(0.49, 4) === 1 && picker.snapIndex(0.51, 4) === 2, 'snapIndex 取整错');
+  assert(picker.snapIndex(-3, 4) === 0 && picker.snapIndex(9, 4) === 3 && picker.snapIndex(NaN, 4) === 0 && picker.snapIndex(0.7, 1) === 0, 'snapIndex 越界没夹住');
+  assert(picker.indexRatio(2, 4) === 2 / 3 && picker.indexRatio(0, 1) === 0.5, 'indexRatio 错');
+  const width = 228;
+  for (let i = 0; i < 4; i += 1) {
+    const px = picker.ratioOffset(picker.indexRatio(i, 4), width);
+    assert(picker.snapIndex(picker.offsetRatio(px + 100, 100, width), 4) === i, '第 ' + i + ' 档的像素位置反推不回来');
+  }
+  assert(picker.ratioOffset(0, width) === picker.THUMB_SIZE / 2 && picker.ratioOffset(1, width) === width - picker.THUMB_SIZE / 2, '拇指行程不是 [14, 宽 − 14]');
+  return '4 档 · 行程 [14, ' + (width - 14) + ']';
+});
+check('功率轨视图：pending 乐观显示、selecting 不重画列表、分组同宿主排序', () => {
+  const groups = [
+    { id: 'other', name: 'Other', models: [{ id: 'x', name: 'X' }] },
+    { id: 'deepseek-official', name: 'DeepSeek', models: [{ id: 'flash', name: 'Flash', reasoning: { defaultEffort: 'high', efforts: [{ id: 'off', name: 'Off' }, { id: 'low', name: 'Low' }, { id: 'high', name: 'High' }, { id: 'max', name: 'Max' }] } }] },
+  ];
+  const current = { provider: 'deepseek-official', model: 'flash', reasoningEffort: 'low' };
+  const idle = picker.viewOf({ groups, current, status: 'ready', pending: null });
+  assert(idle.groups[0].id === 'deepseek-official', '分组没按宿主顺序排（deepseek-official 应在前）');
+  assert(idle.index === 1 && idle.effective === 'low', '生效档错：' + idle.index);
+  const busy = picker.viewOf({ groups, current, status: 'selecting', pending: { ...current, reasoningEffort: 'max' } });
+  assert(busy.index === 3 && busy.pendingEffort === true, 'pending 期间轨没按新档乐观显示（会回弹）');
+  assert(picker.listSignature(idle) === picker.listSignature({ ...idle, status: 'selecting' }), 'selecting 进了列表签名：改档时卡片会被清空重画');
+  const fallback = picker.viewOf({ groups, current: { provider: 'deepseek-official', model: 'flash' }, status: 'ready', pending: null });
+  assert(fallback.effective === 'high' && fallback.index === 2, '未存档位时没退到 defaultEffort');
+  assert(picker.viewOf(null).groups.length === 0 && picker.sessionIdOf(null, () => 'session-x') === 'session-x', '空快照 / 会话回退处理错');
+  return 'ok';
+});
+check('模型选择器样式只画自建节点，不碰宿主菜单', () => {
+  const css = fs.readFileSync(join(SKIN_DIR, 'model-picker.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const selectors = [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim()).filter((s) => s !== '' && !s.startsWith('@') && !/^(from|to|\d+%)$/.test(s));
+  const offenders = [];
+  for (const group of selectors) {
+    for (const sel of group.split(',').map((s) => s.trim())) {
+      if (/role="?menu"?\]|body\s*>/.test(sel)) offenders.push(sel + '（挂宿主菜单）');
+      else if (!/\.codex-mp-/.test(sel)) offenders.push(sel + '（不是自建节点）');
+    }
+  }
+  assert(offenders.length === 0, offenders.join('\n     '));
+  const hasCount = (css.match(/:has\(/g) ?? []).length;
+  assert(hasCount === 1, ':has() 应只有席位那一条，实有 ' + hasCount);
+  return selectors.length + ' 组选择器';
+});
+check('产物里带上了模型选择器，且模板经 ctx.inject 等服务', () => {
+  const clientJs = fs.readFileSync(join(PLUGIN_DIR, 'client.js'), 'utf8');
+  for (const need of ['__modelPicker', 'function installModelPicker', "ctx.inject(['modelDirectories']", 'codex-mp-trigger']) {
+    assert(clientJs.includes(need), 'client.js 里缺 ' + need);
+  }
+  assert(!/const inject = \[[^\]]*modelDirectories/.test(clientJs), 'modelDirectories 进了插件的硬依赖列表：缺这个服务时整个皮肤都不激活');
+  return 'ok';
 });
 
 /* ── 7. 文档成对 ──────────────────────────────────────────────────────── */
@@ -236,14 +304,18 @@ check('文本为无 BOM 的 UTF-8', () => {
 });
 
 /* ── 9. 不留机器专属绝对路径 ──────────────────────────────────────────── */
-check('源码无机器专属绝对路径', () => {
-  const bad = /(?:[A-Za-z]:[\\/](?:Users|A-part-of-new-software|npm-global))|(?:\/home\/[^\s'"]+\/)/g;
+/* 覆盖 JS、样式与文档：样式注释会被原样拼进 theme.css 与 client.js 发出去（0.5.10 就带着一条
+   本机克隆路径），而 client.js 里是 JSON 转义过的 —— 分隔符可能是一个或两个反斜杠。 */
+check('源码、样式与文档无机器专属绝对路径', () => {
+  const bad = /(?:[A-Za-z]:(?:\\{1,2}|\/)(?:Users|A-part-of-new-software|npm-global|codex-ref|codex-src-tmp|PROJIECT)\b)|(?:\/home\/[^\s'"]+\/)|(?:\/Users\/[^\s'"/]+\/)/g;
+  const files = [...jsFiles, ...listFiles(PLUGIN_DIR, ['.css', '.md'])];
   const hits = [];
-  for (const file of jsFiles) {
+  for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
     for (const m of text.matchAll(bad)) hits.push(rel(file) + ' → ' + m[0]);
   }
   assert(hits.length === 0, hits.join('\n     '));
+  return files.length + ' 个文件';
 });
 
 console.log('\n' + (failed === 0 ? 'PASS' : 'FAIL') + '：' + (failed === 0 ? '全部通过' : failed + ' 项未通过'));

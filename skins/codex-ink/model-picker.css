@@ -1,0 +1,471 @@
+/* ============================================================================
+   codex-ink（墨白终端）· L3 模型选择器组件（B 面：功率轨）
+   ----------------------------------------------------------------------------
+   源文件：skins/codex-ink/model-picker.css
+   消费者：src/model-picker.js（自建 DOM，不是宿主的菜单）。
+   由 src/build.mjs 与其余各层一起拼接，并作用域化到 html[data-codex-ui]；
+   本文件写裸选择器，注释里不写花括号（scopeCss 按花括号配对）。
+
+   纪律（0.5.0 卡顿的教训，check-repo 有一条断言守着）：
+     · 本层只画自建节点（.codex-mp-*），外加宿主席位的**一条**隐藏规则；
+     · 一条选择器都不挂宿主的菜单 portal（body 直属的 role=menu），
+       也不改宿主菜单的 display / height / padding。
+
+   取值来源：
+     Codex = app.asar 模型选择器实现块 _Root_xwb5v_19 / _Track_xwb5v_212 /
+             _Tick_xwb5v_40 / _Thumb_xwb5v_12 的逐字值（复刻提示词第六节）；
+     宿主  = dsh-client-ui-model-selection 0.1.7-rc.2 的 ModelSelect.module.css
+             （触发器几何与 z-index 照抄，好让我们的触发器在工具条里与原生那一格同位同高）；
+     本皮肤 = 已有令牌（⑫ 菜单面板契约、⑰ 胶囊、同心圆角）。
+   ============================================================================ */
+
+
+/* ── ① 席位顶替 ─────────────────────────────────────────────────────────
+   我们的触发器在席时，宿主那一格隐藏（仍在 React 树里，生命周期不动）。
+   直接子代 :has() 的失效范围只有席位自己的几个子节点，不是 0.5.0 那种挂在
+   portal 菜单上的长链。触发器一摘（设置里关掉、或组件卸载），宿主那一格立刻复原。 */
+[data-slot="conversation.input.model"]:has(> .codex-mp-trigger) > :not(.codex-mp-trigger) {
+  display: none;
+}
+
+
+/* ── ② 触发器：模型名 + 档位名 + chevron ─────────────────────────────────
+   几何照宿主 _7KE1Ra_trigger（高 28、内衬 0 4 0 8、gap 4、13px/20px、
+   max-width min(360px, 45cqw)），外观走 ⑰ 的 Codex 胶囊：全圆角、默认透明无描边、
+   悬停或展开才填 --dsw-codex-hover-fill。焦点环由 ⑫·1 的席位规则统一画（1px 细线）。 */
+.codex-mp-trigger {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  min-width: 0;
+  max-width: min(360px, 45cqw);
+  padding: 0 4px 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-pill);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color var(--dsw-motion-fast) var(--dsw-ease);
+}
+
+.codex-mp-trigger:hover,
+.codex-mp-trigger[aria-expanded="true"] {
+  background: var(--dsw-codex-hover-fill);
+}
+
+.codex-mp-trigger-model {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 档位文字叠层（Codex _ModelPickerTriggerEffortText 逐字）：各档名叠在同一格，
+   格宽取最宽的名字；当前那层清晰，其余 opacity 0 + blur(--blur-xs = 4px)。
+   改档因此是模糊交叉淡入，不是换文本，触发器宽度也不跳。 */
+.codex-mp-effort-layers {
+  display: grid;
+  grid-template-columns: max-content;
+  flex-shrink: 1000;
+  width: max-content;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+}
+
+.codex-mp-effort-layers[hidden] {
+  display: none;
+}
+
+.codex-mp-effort-text {
+  grid-area: 1 / 1;
+  justify-self: center;
+  opacity: 0;
+  filter: blur(4px);
+  white-space: nowrap;
+  will-change: opacity, filter;
+  transition:
+    opacity var(--dsw-motion-slow) var(--dsw-ease),
+    filter var(--dsw-motion-slow) var(--dsw-ease);
+}
+
+.codex-mp-effort-text[data-active="true"] {
+  opacity: 1;
+  filter: none;
+}
+
+/* chevron：宿主 _7KE1Ra_chevron 的 .12s 翻转 */
+.codex-mp-trigger-chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-label-caption);
+  transition: transform 120ms var(--dsw-ease);
+}
+
+.codex-mp-trigger[aria-expanded="true"] .codex-mp-trigger-chevron {
+  transform: rotate(180deg);
+}
+
+
+/* ── ③ 弹层 ─────────────────────────────────────────────────────────────
+   宽：Codex calc(var(--spacing) * 63.5)，--spacing = 4px ⇒ 254px。
+   入场：Codex .32s cubic-bezier(.23, 1, .32, 1) 30ms both，opacity 0 / scale(.98) → 1；
+         弹层在触发器上方、右沿对齐，所以从右下角长出来。
+   面板：⑫·2 的菜单契约 —— 不透明 layer-1 + 18px 圆角 + 内衬 5px + 0 8px 32px 软影 + 1px 环。
+   z-index / max-height 照宿主 _7KE1Ra_menu。 */
+.codex-mp-popover {
+  position: fixed;
+  z-index: 1100;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: calc(4px * 63.5);
+  max-width: calc(100vw - 24px);
+  max-height: min(360px, 100vh - 96px);
+  padding: 5px;
+  border-radius: var(--dsw-radius-menu);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: 0 8px 32px rgba(13, 13, 13, 0.13), 0 0 0 1px rgba(13, 13, 13, 0.04);
+  font-size: 13px;
+  line-height: 20px;
+  transform-origin: bottom right;
+  animation: codex-mp-enter 0.32s cubic-bezier(0.23, 1, 0.32, 1) 30ms both;
+}
+
+body[data-ds-dark-theme] .codex-mp-popover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(236, 236, 236, 0.05);
+}
+
+.codex-mp-popover[hidden] {
+  display: none;
+}
+
+.codex-mp-popover[data-reduced-motion="true"] {
+  animation: none;
+}
+
+@keyframes codex-mp-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 提交失败那一条（宿主 _7KE1Ra_error 的底色、字色、11px/16px；圆角按同心取 18 − 5） */
+.codex-mp-error {
+  flex: none;
+  margin-bottom: 3px;
+  padding: 6px 9px;
+  border-radius: calc(var(--dsw-radius-menu) - 5px);
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.codex-mp-error[hidden] {
+  display: none;
+}
+
+
+/* ── ④ 模型列表：行几何同 ⑫·3（28px / 4px 9px / gap 8 / 圆角 18 − 5 = 13） ── */
+.codex-mp-list {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.codex-mp-status {
+  padding: 8px 9px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.codex-mp-retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 分组标题：宿主 _7KE1Ra_groupTitle 的 11px/16px/500 辅墨；横向内衬对齐行文字的 9px */
+.codex-mp-group {
+  padding: 4px 9px 2px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.codex-mp-group:not(:first-child) {
+  margin-top: 3px;
+}
+
+.codex-mp-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: calc(var(--dsw-radius-menu) - 5px);
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.codex-mp-row:hover,
+.codex-mp-row[aria-checked="true"] {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+/* 键盘焦点：菜单内改 1px 内描线（全局 2px 环不贴行盒） */
+.codex-mp-row:focus-visible {
+  outline: 1px solid var(--dsw-focus-ring-color);
+  outline-offset: -1px;
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.codex-mp-row[aria-busy="true"] {
+  cursor: progress;
+}
+
+.codex-mp-row-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.codex-mp-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* 说明：宿主 _7KE1Ra_status 的 12px/18px 辅墨，单行截断（全文在 title 里） */
+.codex-mp-row-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.codex-mp-row-check {
+  display: grid;
+  flex: 0 0 14px;
+  place-items: center;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* pending 转圈：与 ⑫ 同一副（12px / 1.5px 环 / 顶边前景色 / Codex --animate-spin 1s linear） */
+.codex-mp-spinner {
+  box-sizing: border-box;
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--dsw-alias-border-l3);
+  border-top-color: var(--dsw-alias-label-primary);
+  border-radius: 50%;
+  animation: codex-ui-spin 1s linear infinite;
+}
+
+
+/* ── ⑤ 推理等级：标题行 + 功率轨 ─────────────────────────────────────────
+   与列表之间一条 0.5px l1 发丝线（发丝即层级）；标题行与菜单行同高同衬。 */
+.codex-mp-effort {
+  flex: none;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.codex-mp-effort[hidden] {
+  display: none;
+}
+
+.codex-mp-effort-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 4px 9px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.codex-mp-effort-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Codex _Container：高 32 / 上下 2 / 左右 6 / 外边 2，纵向居中 */
+.codex-mp-container {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 32px;
+  margin-inline: 2px;
+  padding-block: 2px;
+  padding-inline: 6px;
+}
+
+/* Codex _Root：高 28、整宽、居中；touch-action: none 必须写，否则移动端手势被滚动抢走。
+   动效令牌逐字：主曲线 .3s cubic-bezier(.23, 1, .32, 1)，档位变换 .12s，
+   拇指跟随时长首帧 0s（脚本 16ms 后打 data-armed 抬到 .3s，打开时不从 0 滑过来）。 */
+.codex-mp-root {
+  --codex-mp-motion-duration: 0.3s;
+  --codex-mp-motion-easing: cubic-bezier(0.23, 1, 0.32, 1);
+  --codex-mp-tick-transform-duration: 0.12s;
+  --codex-mp-thumb-motion-duration: 0s;
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 28px;
+  outline: none;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.codex-mp-root[data-armed="true"] {
+  --codex-mp-thumb-motion-duration: var(--codex-mp-motion-duration);
+}
+
+.codex-mp-root[data-dragging="true"],
+.codex-mp-root[data-dragging="true"] .codex-mp-tick {
+  cursor: grabbing;
+}
+
+.codex-mp-root[data-disabled="true"] {
+  opacity: 0.6;
+}
+
+.codex-mp-popover[data-reduced-motion="true"] .codex-mp-root {
+  --codex-mp-motion-duration: 0s;
+  --codex-mp-tick-transform-duration: 0s;
+  --codex-mp-thumb-motion-duration: 0s;
+}
+
+/* Codex _Track：24px 高、12px 圆角、前景 10% 底、0.5px 内描边（--color-border） */
+.codex-mp-track {
+  position: relative;
+  flex-grow: 1;
+  height: 24px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--dsw-codex-border);
+}
+
+/* Codex _Range：强调色，只圆左侧两角，止于拇指中线。
+   位置公式与拇指、圆点同一条：calc(14px + (100% − 28px) × pos)。 */
+.codex-mp-range {
+  position: absolute;
+  top: 0;
+  inset-inline-start: 0;
+  width: calc(14px + (100% - 28px) * var(--codex-mp-pos, 0));
+  height: 100%;
+  border-radius: 12px 0 0 12px;
+  background: var(--dsw-alias-link);
+  transition: width var(--codex-mp-thumb-motion-duration) var(--codex-mp-motion-easing);
+}
+
+/* Codex _Tick：4px 圆点，热区 16px（::before 外扩 6px）；走过的 30% 白，没走到的 description 50% */
+.codex-mp-tick {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  color: color-mix(in srgb, var(--dsw-alias-label-tertiary) 50%, transparent);
+  transform: translate(-50%, -50%);
+  transition:
+    transform var(--codex-mp-tick-transform-duration) var(--codex-mp-motion-easing),
+    filter var(--codex-mp-tick-transform-duration) var(--codex-mp-motion-easing);
+}
+
+.codex-mp-tick::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.codex-mp-tick:hover {
+  filter: brightness(0.85);
+  transform: translate(-50%, -50%) scale(2);
+}
+
+.codex-mp-tick[data-selected="true"] {
+  color: #ffffff4d;
+}
+
+/* Codex _ThumbScale + _Thumb：28px 定位盒 + 白色圆片（0.5px 强描边 + 0 0 2px 10% 微影）。
+   白片亮暗同色，Codex 原样如此。 */
+.codex-mp-thumb-scale {
+  position: absolute;
+  top: 50%;
+  left: calc(14px + (100% - 28px) * var(--codex-mp-pos, 0));
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  will-change: left;
+  transition: left var(--codex-mp-thumb-motion-duration) var(--codex-mp-motion-easing);
+}
+
+.codex-mp-thumb {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: block;
+  border: 0.5px solid var(--dsw-codex-border-strong);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 2px #0000001a;
+}
+
+/* 键盘焦点：Codex outline 2px + offset 0，画在拇指上（不是全局那条 2px + 2px） */
+.codex-mp-root[data-keyboard-focused="true"] .codex-mp-thumb-scale {
+  outline: 2px solid var(--dsw-focus-ring-color);
+  outline-offset: 0;
+}
+
+/* 没有生效档（跟随提供方默认）：拇指与色条不画，只剩轨与圆点 */
+.codex-mp-root[data-unset] .codex-mp-thumb-scale,
+.codex-mp-root[data-unset] .codex-mp-range {
+  visibility: hidden;
+}
