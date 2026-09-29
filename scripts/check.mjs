@@ -163,6 +163,17 @@ attempt('覆盖层：默认值不产生任何 CSS', () => {
   assert(override.themeOverrideCss({ translucentSidebar: false, modelPicker: true, contrastLight: 45, contrastDark: 60 }) === '', '默认档位下输出了 CSS');
   return '空串';
 });
+attempt('覆盖层：半透明侧栏钉住设置页背板', () => {
+  /* 设置页全屏背板吃 --dsw-alias-bg-sidebar（settings-modal.css §1 裁决为不透明），
+     半透明开关把它改写成 rgba 后整页透出主窗口、导航与主侧栏文字重影 —— 必须钉回实色。 */
+  const css = override.themeOverrideCss({ translucentSidebar: true });
+  assert(css.includes('div[data-cx-sm-panel]'), '半透明开启时缺少设置页面板规则');
+  assert(css.includes('--cx-sm-surface-backdrop: ' + override.SKIN_DEFAULTS.light.sidebar), '浅色背板未钉回实色');
+  assert(css.includes('--cx-sm-surface-backdrop: ' + override.SKIN_DEFAULTS.dark.sidebar), '深色背板未钉回实色');
+  assert(css.includes('--cx-sm-card-edge: ' + override.SKIN_DEFAULTS.light.sidebar), '浅色卡边未钉回实色');
+  assert(!/body\[data-ds-dark-theme\] div\[data-cx-sm-panel\] \{[^}]*--cx-sm-card-edge/.test(css), '深色卡边压掉了皮肤的 border-l1 分主题规则');
+  return '背板双色 + 浅色卡边';
+});
 attempt('覆盖层：色值与字体栈校验', () => {
   assert(override.isHex('#339cff') && override.isHex('#ABCDEF'), '合法十六进制被拒');
   for (const bad of ['339cff', '#339c', '#339cfff', 'red', '', ' #339cff; }', null, undefined]) assert(!override.isHex(bad), '非法色值被接受：' + String(bad));

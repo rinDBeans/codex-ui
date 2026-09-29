@@ -257,6 +257,9 @@ dark default, 60):
 - The translucent sidebar has no window layer to reveal on the web, and in dark the sidebar shares the surface colour,
   so it is invisible there — the switch therefore also turns the sidebar row fills translucent, otherwise it would be
   completely silent in dark. Recorded as a gap, not presented as an equivalent.
+- With the switch on, the settings page backdrop stays pinned to the solid sidebar colour: the settings panel is a
+  full-window overlay whose backdrop reuses the sidebar token, and a translucent backdrop would show the main window
+  bleeding through it.
 - The skin paints the canvas itself: `html` and `body` both carry this skin's base colour in either theme (`html` follows
   through `:has(body[data-ds-dark-theme])`, because the host stamps the theme marker on `body` only). Transitions are
   suppressed for the two frames after a theme change (`html[data-codex-ui-switching] *`, set by the browser half on

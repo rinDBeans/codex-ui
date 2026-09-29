@@ -212,6 +212,15 @@ export function themeOverrideCss(values = {}) {
     const decls = dark.map(([k, v]) => '  ' + k + ': ' + v + ';').join('\n');
     blocks.push(sel('dark') + ' {\n' + decls + '\n}');
   }
+  if (values.translucentSidebar === true) {
+    /* 设置页背板（--cx-sm-surface-backdrop）复用 --dsw-alias-bg-sidebar：开关把它改成
+       rgba 后，全屏设置页会透出压在下面的主窗口，导航与主侧栏文字重影。
+       背板设计裁决为不透明（settings-modal.css §1），这里按主题钉回实色侧栏色；
+       浅色连卡边（--cx-sm-card-edge 同吃一令牌）一起钉；深色的卡边皮肤另有
+       border-l1 分主题规则且元素数更多，本规则压不过、也不需要压。 */
+    blocks.push(sel('light') + ' div[data-cx-sm-panel] {\n  --cx-sm-surface-backdrop: ' + SKIN_DEFAULTS.light.sidebar + ';\n  --cx-sm-card-edge: ' + SKIN_DEFAULTS.light.sidebar + ';\n}');
+    blocks.push(sel('dark') + ' div[data-cx-sm-panel] {\n  --cx-sm-surface-backdrop: ' + SKIN_DEFAULTS.dark.sidebar + ';\n}');
+  }
   return blocks.join('\n\n');
 }
 
