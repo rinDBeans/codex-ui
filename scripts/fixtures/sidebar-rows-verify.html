@@ -1,0 +1,232 @@
+<!doctype html><html data-codex-ui><head><meta charset="utf-8"><title>sidebar-rows-verify</title>
+<!--
+  sidebar-rows-verify — T09「侧栏组织与密度」的纯皮肤层夹具。
+
+  与 text-overlay-verify.html 同一条纪律：不仿真宿主组件逻辑、不接 app.asar，
+  只摆出宿主真实渲染出来的 DOM 形状与宿主真实的 CSS 模块规则，用来读本皮肤在计算样式上的承诺。
+
+  ── 行 DOM 的来源（全部实测取得，不是照名字推的）────────────────────────────
+  read: @deepseek-ai/dsh-client-ui-workspace/lib/client.js
+  - 行锚：div[role="treeitem"][data-row-key="workspace:<key>"]（会话行同款，键前缀不同）
+  - 宿主**不**给行打任何状态 data-* 属性；每行状态只由 CSS 模块类后缀承载
+    （_sessionRow / _projectRow / _selected / _archived / _menuOpen / _folder / _chevron / …）
+  - 长标题裁剪由 title 上的 data-clipped / data-scrolled 两个属性驱动 mask-image
+  - data-dsh-part：宿主从不打。本夹具一处都不用，避免写出永不命中的死规则。
+
+  ── 本文件里三段 <style> 的归属（务必分清，否则会把宿主行为记成皮肤功劳）─────
+  ① host-tokens  ：宿主设计系统令牌（圆角 / 缩进 / 缓动）。皮肤 skin.css **不**定义它们，
+                   夹具必须自备，否则宿主规则的 var() 解析失败、几何量不出来。
+  ② host-rows    ：宿主 Rows.module.css 的**逐字摘录**（模块哈希 YDXeBa），
+                   只摘与本验收相关的规则；未摘下的是悬停卡片与拖拽落点装饰（本夹具不涉及）。
+                   选择器保留真实哈希前缀，判据侧统一用 [class*="_suffix"] 匹配，
+                   与皮肤 sidebar-align.css 的 [class*="_collapsed"] 同一手法（哈希漂移不影响）。
+  ③ fixture-chrome：夹具自己的外壳尺寸。**不是**宿主样式，也不是皮肤样式，
+                   只为把侧栏摆成 280px 好量几何；皮肤不得依赖它。
+
+  ── 皮肤怎么进来 ────────────────────────────────────────────────────────
+  皮肤由 scripts/specs/sidebar-rows.mjs 在加载时注入**构建产物 theme.css**（不是重拼源码），
+  与 text.mjs 的 render() 同一手法。夹具本身不含任何皮肤规则 ——
+  「皮肤有没有参与侧栏行」这件事必须能被量出来，不能被夹具里自带的样式冒充。
+-->
+<style>
+/* ① host-tokens：宿主设计系统令牌。皮肤 skin.css 未定义，夹具按宿主默认值自备。 */
+:root{
+  --dsw-radius-xs:4px;
+  --dsw-radius-sm:6px;
+  --dsw-radius-md:8px;
+  --dsw-radius-lg:12px;
+  --dsh-workspace-indent:0px;
+  --ds-ease-in-out:cubic-bezier(.4,0,.2,1);
+}
+</style>
+<style>
+/* ② host-rows：宿主 Rows.module.css 逐字摘录（哈希 YDXeBa）。 */
+.YDXeBa_projectRow,.YDXeBa_sessionRow{border-radius:var(--dsw-radius-md);padding:0 8px;cursor:pointer;user-select:none;color:var(--dsw-alias-label-primary);align-items:center;gap:6px;padding-inline-start:calc(8px + var(--dsh-workspace-indent,0px));display:flex}
+.YDXeBa_projectRow:hover,.YDXeBa_sessionRow:hover,.YDXeBa_sessionRow.YDXeBa_selected{background:var(--dsw-alias-interactive-bg-hover)}
+.YDXeBa_searchResultRow{box-sizing:border-box;border-radius:var(--dsw-radius-lg);cursor:pointer;text-align:left;width:100%;min-height:48px;color:var(--dsw-alias-label-primary);background:0 0;border:none;flex-direction:column;align-items:stretch;padding:4px 8px;display:flex}
+.YDXeBa_searchResultRow:hover,.YDXeBa_searchResultRow.YDXeBa_selected{background:var(--dsw-alias-interactive-bg-hover)}
+.YDXeBa_searchResultHeading{align-items:center;min-width:0;display:flex}
+.YDXeBa_searchResultTitle{text-overflow:ellipsis;white-space:nowrap;flex:0 auto;min-width:0;margin-left:4px;font-size:14px;line-height:20px;overflow:hidden}
+.YDXeBa_searchResultMeta{align-items:center;gap:6px;min-width:0;margin-left:20px;display:flex}
+.YDXeBa_searchResultWorkspace,.YDXeBa_searchResultSnippet{text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:17px;overflow:hidden}
+.YDXeBa_searchResultWorkspace{max-width:40%;color:var(--dsw-alias-label-tertiary);flex:none}
+.YDXeBa_searchResultWorkspace:only-child{max-width:100%}
+.YDXeBa_searchResultSnippet{min-width:0;color:var(--dsw-alias-label-secondary);flex:1}
+.YDXeBa_projectRow{box-sizing:border-box;align-items:center;height:34px}
+.YDXeBa_projectRow .YDXeBa_rowActions{height:20px}
+.YDXeBa_sessionRow{gap:0;height:32px}
+.YDXeBa_sessionRow .YDXeBa_title{margin:0 6px 0 4px}
+.YDXeBa_slot{width:16px;height:20px;color:var(--dsw-alias-label-tertiary);flex:none;justify-content:center;align-items:center;display:inline-flex}
+.YDXeBa_folderActive{color:var(--dsw-alias-state-business-primary)}
+.YDXeBa_projectRow .YDXeBa_chevron{display:none}
+.YDXeBa_projectRow:hover .YDXeBa_chevron{display:inline-flex}
+.YDXeBa_projectRow:hover .YDXeBa_folder{display:none}
+.YDXeBa_arrow{transition:transform .15s var(--ds-ease-in-out)}
+.YDXeBa_arrowOpen{transform:rotate(90deg)}
+.YDXeBa_projectText{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}
+.YDXeBa_title{text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:14px;line-height:20px;overflow:hidden}
+.YDXeBa_sessionRow .YDXeBa_title{flex:1}
+.YDXeBa_sessionRow .YDXeBa_title[data-scrolled]{mask-image:linear-gradient(90deg,#0000,#000 12px)}
+.YDXeBa_sessionRow .YDXeBa_title[data-clipped]{mask-image:linear-gradient(270deg,#0000,#000 12px)}
+.YDXeBa_sessionRow .YDXeBa_title[data-scrolled][data-clipped]{mask-image:linear-gradient(90deg,#0000,#000 12px calc(100% - 12px),#0000)}
+.YDXeBa_meta{text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:20px;overflow:hidden}
+.YDXeBa_time{color:var(--dsw-alias-label-tertiary);flex:none;font-size:10px;line-height:16px}
+.YDXeBa_pinIndicator{width:16px;height:20px;color:var(--dsw-alias-label-caption);flex:none;justify-content:center;align-items:center;margin-left:6px;display:inline-flex}
+.YDXeBa_sessionRow.YDXeBa_archived .YDXeBa_title,.YDXeBa_searchResultRow.YDXeBa_archived .YDXeBa_searchResultTitle,.YDXeBa_searchResultRow.YDXeBa_archived .YDXeBa_searchResultWorkspace,.YDXeBa_searchResultRow.YDXeBa_archived .YDXeBa_searchResultSnippet{color:var(--dsw-alias-label-caption)}
+.YDXeBa_dot{flex:none}
+.YDXeBa_rowActions{flex:none;align-items:center;gap:10px;display:none}
+.YDXeBa_projectRow:hover .YDXeBa_rowActions,.YDXeBa_sessionRow:hover .YDXeBa_rowActions,.YDXeBa_searchResultRow:hover .YDXeBa_rowActions,.YDXeBa_projectRow.YDXeBa_menuOpen .YDXeBa_rowActions,.YDXeBa_sessionRow.YDXeBa_menuOpen .YDXeBa_rowActions{display:inline-flex}
+.YDXeBa_searchResultHeading .YDXeBa_rowActions{margin-left:auto}
+.YDXeBa_sessionRow:hover .YDXeBa_time,.YDXeBa_sessionRow.YDXeBa_menuOpen .YDXeBa_time,.YDXeBa_sessionRow:hover .YDXeBa_pinIndicator,.YDXeBa_sessionRow.YDXeBa_menuOpen .YDXeBa_pinIndicator{display:none}
+@media (hover:hover){.YDXeBa_sessionRow:hover .YDXeBa_title,.YDXeBa_sessionRow.YDXeBa_menuOpen .YDXeBa_title{text-overflow:clip}}
+.YDXeBa_projectRow.YDXeBa_menuOpen,.YDXeBa_sessionRow.YDXeBa_menuOpen{background:var(--dsw-alias-interactive-bg-hover)}
+.YDXeBa_iconButton{border-radius:var(--dsw-radius-xs);cursor:pointer;width:16px;height:16px;color:var(--dsw-alias-label-tertiary);background:0 0;border:none;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex}
+.YDXeBa_iconButton:hover{color:var(--dsw-alias-label-primary)}
+.YDXeBa_chevron{color:var(--dsw-alias-label-caption)}
+@media (prefers-reduced-motion:reduce){.YDXeBa_arrow{transition:none;animation:none}}
+</style>
+<style>
+/* ③ fixture-chrome：夹具外壳，只为摆出 280px 侧栏。皮肤不得依赖这些规则。 */
+body{margin:0;font:14px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;background:var(--dsw-alias-bg-base);}
+.shell{display:flex;min-height:100vh;}
+[data-slot="sidebar"]{width:280px;flex:none;box-sizing:border-box;padding:8px;background:var(--dsw-alias-bg-sidebar);overflow:hidden;}
+.sb-root{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.sb-new{height:36px;display:flex;align-items:center;gap:6px;border:0;background:transparent;font:inherit;color:var(--dsw-alias-label-primary);}
+.fixture-group{color:var(--dsw-alias-label-tertiary);font-size:11px;padding:6px 8px 2px;}
+.fixture-empty{color:var(--dsw-alias-label-tertiary);font-size:12px;padding:12px 8px;text-align:center;}
+.fixture-searchbox{display:flex;align-items:center;gap:6px;padding:4px 8px;}
+.fixture-searchbox input{flex:1;min-width:0;font:inherit;background:transparent;border:0;color:inherit;}
+.fixture-hint{color:var(--dsw-alias-label-caption);font-size:11px;padding:2px 8px 6px;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div data-slot="sidebar" id="sidebar">
+    <div id="sb-root" class="sb-root">
+
+      <button type="button" id="sb-new" class="sb-new">新会话</button>
+
+      <div class="fixture-group">今天</div>
+
+      <!-- 普通会话行 -->
+      <div id="row-normal" class="YDXeBa_sessionRow" data-row-key="session:normal" role="treeitem" aria-selected="false">
+        <span class="YDXeBa_slot">·</span>
+        <span class="YDXeBa_title">普通会话标题</span>
+        <span class="YDXeBa_time">14:02</span>
+        <span class="YDXeBa_rowActions">
+          <button type="button" class="YDXeBa_iconButton" aria-label="会话操作">⋯</button>
+        </span>
+      </div>
+
+      <!-- 选中 / 活动会话行 -->
+      <div id="row-selected" class="YDXeBa_sessionRow YDXeBa_selected" data-row-key="session:selected" role="treeitem" aria-selected="true">
+        <span class="YDXeBa_slot">·</span>
+        <span class="YDXeBa_title">当前正在看的会话</span>
+        <span class="YDXeBa_time">13:40</span>
+        <span class="YDXeBa_rowActions">
+          <button type="button" class="YDXeBa_iconButton" aria-label="会话操作">⋯</button>
+        </span>
+      </div>
+
+      <!-- 悬停行（由 spec 用真鼠标移入触发） -->
+      <div id="row-hover" class="YDXeBa_sessionRow" data-row-key="session:hover" role="treeitem" aria-selected="false">
+        <span class="YDXeBa_slot">·</span>
+        <span class="YDXeBa_title">鼠标移入这一行</span>
+        <span class="YDXeBa_time">12:10</span>
+        <span class="YDXeBa_rowActions">
+          <button type="button" class="YDXeBa_iconButton" aria-label="会话操作">⋯</button>
+        </span>
+      </div>
+
+      <!-- 置顶行 -->
+      <div id="row-pinned" class="YDXeBa_sessionRow" data-row-key="session:pinned" role="treeitem" aria-selected="false">
+        <span class="YDXeBa_slot">·</span>
+        <span class="YDXeBa_title">置顶的会话</span>
+        <span class="YDXeBa_time">11:00</span>
+        <span class="YDXeBa_pinIndicator" aria-label="已置顶">📌</span>
+        <span class="YDXeBa_rowActions">
+          <button type="button" class="YDXeBa_iconButton" aria-label="会话操作">⋯</button>
+        </span>
+      </div>
+
+      <!-- 归档行 -->
+      <div id="row-archived" class="YDXeBa_sessionRow YDXeBa_archived" data-row-key="session:archived" role="treeitem" aria-selected="false">
+        <span class="YDXeBa_slot">·</span>
+        <span class="YDXeBa_title">已归档的会话</span>
+        <span class="YDXeBa_time">09:20</span>
+        <span class="YDXeBa_rowActions">
+          <button type="button" class="YDXeBa_iconButton" aria-label="会话操作">⋯</button>
+        </span>
+      </div>
+
+      <!-- 长标题被裁剪（data-clipped + data-scrolled 同时给） -->
+      <div id="row-clipped" class="YDXeBa_sessionRow" data-row-key="session:clipped" role="treeitem" aria-selected="false">
+        <span class="YDXeBa_slot">·</span>
+        <span id="row-clipped-title" class="YDXeBa_title" data-clipped data-scrolled>这是一个非常非常长的会话标题用来验证裁剪行为不会把侧栏撑出一条横向滚动条出来</span>
+        <span class="YDXeBa_rowActions">
+          <button type="button" class="YDXeBa_iconButton" aria-label="会话操作">⋯</button>
+        </span>
+      </div>
+
+      <div class="fixture-group">项目</div>
+
+      <!-- 项目行：展开 -->
+      <div id="row-project-open" class="YDXeBa_projectRow" data-row-key="workspace:ws-open" role="treeitem" aria-expanded="true">
+        <span class="YDXeBa_slot YDXeBa_folder YDXeBa_folderActive">📂</span>
+        <span class="YDXeBa_slot YDXeBa_chevron"><span class="YDXeBa_arrow YDXeBa_arrowOpen">▶</span></span>
+        <span class="YDXeBa_projectText"><span class="YDXeBa_title">已展开的项目</span></span>
+        <span class="YDXeBa_rowActions">
+          <button type="button" class="YDXeBa_iconButton" aria-label="项目操作">⋯</button>
+        </span>
+      </div>
+
+      <!-- 项目行：折叠 -->
+      <div id="row-project-closed" class="YDXeBa_projectRow" data-row-key="workspace:ws-closed" role="treeitem" aria-expanded="false">
+        <span class="YDXeBa_slot YDXeBa_folder">📁</span>
+        <span class="YDXeBa_slot YDXeBa_chevron"><span class="YDXeBa_arrow">▶</span></span>
+        <span class="YDXeBa_projectText"><span class="YDXeBa_title">已折叠的项目</span></span>
+        <span class="YDXeBa_rowActions">
+          <button type="button" class="YDXeBa_iconButton" aria-label="项目操作">⋯</button>
+        </span>
+      </div>
+
+      <div class="fixture-group">搜索</div>
+
+      <!-- 搜索展开：有结果 -->
+      <div id="search-expanded" class="YDXeBa_searchExpanded">
+        <div class="fixture-searchbox YDXeBa_searchInput">
+          <input type="search" aria-label="搜索会话" value="会话" tabindex="0">
+          <button type="button" class="YDXeBa_searchButton" aria-label="清除搜索">✕</button>
+        </div>
+        <div id="search-results" class="YDXeBa_searchResults">
+          <div id="row-search-result" class="YDXeBa_searchResultRow" data-row-key="session:sr-1" role="treeitem" aria-selected="false">
+            <span class="YDXeBa_searchResultHeading">
+              <span class="YDXeBa_slot">·</span>
+              <span class="YDXeBa_searchResultTitle">匹配到的会话</span>
+              <span class="YDXeBa_rowActions">
+                <button type="button" class="YDXeBa_iconButton" aria-label="会话操作">⋯</button>
+              </span>
+            </span>
+            <span class="YDXeBa_searchResultMeta">
+              <span class="YDXeBa_searchResultWorkspace">项目名</span>
+              <span class="YDXeBa_searchResultSnippet">……命中片段……</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 空状态：无会话时的占位 -->
+  <div id="empty-state" class="YDXeBa_emptyState fixture-empty">
+    <div id="empty-label" class="YDXeBa_emptyLabel">还没有会话</div>
+    <button type="button" id="empty-action" class="YDXeBa_emptyAction">新建一个</button>
+  </div>
+
+  <!-- 搜索无结果态（默认隐藏，由 spec 切换） -->
+  <div id="search-empty" class="YDXeBa_searchEmpty fixture-empty" hidden>
+    <div class="YDXeBa_emptyLabel">没有匹配的会话</div>
+  </div>
+</div>
+</body></html>

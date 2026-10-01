@@ -1,0 +1,53 @@
+/* codex-ink · L3 侧栏行视觉映射（T09）
+   前提：宿主已自带搜索 / 长名遮罩 / 归档 / 置顶 / 行菜单 / 宽度控制，本层**不重造**任何功能
+   （read: dsh-client-ui-workspace 渲染代码与 Rows.module.css）。这里只把既有的行状态映射成稳定可辨识的视觉。
+
+   锚点全部用宿主**语义属性**，不用 CSS-Modules 哈希类名 —— 宿主每次构建哈希都会变
+   （实测前缀 .YDXeBa_ / .bhn1Oq_ / .hHd-Xa_），只有属性是契约：
+     [data-row-key^="session:"]     会话行
+     [data-row-key^="workspace:"]   工作区/项目行
+     [data-row-key="empty"]         空态
+     [data-row-key^="overflow:"]    行溢出（展开更多会话）
+     [aria-selected="true"]         选中态（会话行与搜索结果行都有）
+     [data-clipped] / [data-scrolled] 长名两侧遮罩（宿主已实现，本层不覆盖）
+
+   不可修项（写在这里以免后人重蹈）：宿主 rowActions 默认 display:none，只在 :hover 或 _menuOpen 时
+   变 inline-flex；行本身是 div[role=treeitem] **没有 tabIndex**（整个 workspace bundle 只有搜索框带
+   tabIndex），因此 :focus-within 永远不会触发 —— 键盘用户进不了行菜单。纯 CSS 无法把 display:none
+   变成可聚焦，按方案 §7.2 记为宿主提案，不在皮肤层伪造。 */
+
+/* 行的基准几何：与 sidebar-align.css 的新会话行落到同一条左内衬 */
+[data-slot="sidebar"] [data-row-key^="session:"],
+[data-slot="sidebar"] [data-row-key^="workspace:"] {
+  border-radius: var(--dsw-radius-s);
+  transition: background-color 120ms var(--ds-ease-in-out, ease-out);
+}
+
+/* 选中态：当前会话。宿主只给 aria-selected，没有背景，这里补上可辨识的填充。
+   用 --dsw-alias-interactive-bg-active 而非新颜色，避免与调色板脱钩。 */
+[data-slot="sidebar"] [data-row-key^="session:"][aria-selected="true"] {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+/* 归档行：宿主已把标题降为 label-caption，这里只保证它不会被选中态的填充盖住可读性 */
+[data-slot="sidebar"] [data-row-key^="session:"] [class*="_title"] {
+  min-width: 0;
+}
+
+/* 行内状态点：宿主用 StateDot，其 data-state 是**第二套词表**
+   （done|warning|ongoing|error|idle），与工具行 ToolRowState 同名不同义。
+   这里不重涂，只保证不与皮肤的行文字色撞车；任何重涂都必须带行锚点前缀。 */
+[data-slot="sidebar"] [data-row-key^="session:"] [data-state] {
+  flex: none;
+}
+
+/* 溢出按钮（工作区行下方的"展开更多"）：常态低对比，hover/展开时才实心 */
+[data-slot="sidebar"] [data-row-key^="overflow:"] {
+  border-radius: var(--dsw-radius-s);
+  color: var(--dsw-alias-label-caption);
+}
+[data-slot="sidebar"] [data-row-key^="overflow:"]:hover,
+[data-slot="sidebar"] [data-row-key^="overflow:"]:focus-visible {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}

@@ -1686,6 +1686,34 @@ html[data-codex-ui] [data-slot="sidebar"] > div:not([class*="_collapsed"]) > nav
   margin-left: 0;
 }
 
+html[data-codex-ui] [data-slot="sidebar"] [data-row-key^="session:"],
+html[data-codex-ui] [data-slot="sidebar"] [data-row-key^="workspace:"] {
+  border-radius: var(--dsw-radius-s);
+  transition: background-color 120ms var(--ds-ease-in-out, ease-out);
+}
+
+html[data-codex-ui] [data-slot="sidebar"] [data-row-key^="session:"][aria-selected="true"] {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+html[data-codex-ui] [data-slot="sidebar"] [data-row-key^="session:"] [class*="_title"] {
+  min-width: 0;
+}
+
+html[data-codex-ui] [data-slot="sidebar"] [data-row-key^="session:"] [data-state] {
+  flex: none;
+}
+
+html[data-codex-ui] [data-slot="sidebar"] [data-row-key^="overflow:"] {
+  border-radius: var(--dsw-radius-s);
+  color: var(--dsw-alias-label-caption);
+}
+html[data-codex-ui] [data-slot="sidebar"] [data-row-key^="overflow:"]:hover,
+html[data-codex-ui] [data-slot="sidebar"] [data-row-key^="overflow:"]:focus-visible {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 html[data-codex-ui] div > [data-slot="sidebar.workspaces"] [class$="_fade"] {
   display: none;
 }

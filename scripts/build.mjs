@@ -28,6 +28,7 @@ export const SKIN_PARTS = [
   'content.css', // L3 高频内容：工具卡 / 回合摘要详情 / 状态三档（T07）
   'model-picker.css', // L3 模型选择器组件
   'sidebar-align.css', // L3 侧栏对齐
+  'sidebar-rows.css', // L3 侧栏行视觉映射（T09）
   'sidebar-surface.css', // L3 侧栏滚动渐隐
   'window-shadow.css', // L3 窗口边缘
   'composer.css', // L3 输入区
