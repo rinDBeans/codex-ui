@@ -249,15 +249,14 @@ async function rows(t) {
     };
   });
   t.log('焦点探针 ' + JSON.stringify(focusProbe));
-  /* (c1)(c2) 记 XFAIL 而非 FAIL：根因在宿主，纯 CSS 修不了（详见 why）。
-     断言本身保留 —— 宿主一旦加了 tabIndex，这里自动转 PASS 并从汇总里消失。 */
-  t.xfail('(c1) 会话行可被键盘聚焦（tabIndex ≥ 0）',
+  /* (c1)(c2) 故意记 FAIL、当 CI 红线：这两条查实是宿主缺陷且纯 CSS 修不了
+     （宿主缺陷：行是 div[role=treeitem] 且不带 tabIndex（整个 workspace bundle 仅搜索框有 tabIndex），纯 CSS 无法让不可聚焦元素获得焦点；需宿主加 roving tabindex），但按用户决定保留为硬失败，直到宿主修好为止，不豁免。
+     宿主一旦加了 tabIndex，这两条自然转 PASS。 */
+  t.check('(c1) 会话行可被键盘聚焦（tabIndex ≥ 0）',
     focusProbe.tabIndex >= 0,
-    '宿主缺陷：行是 div[role=treeitem] 且不带 tabIndex（整个 workspace bundle 仅搜索框有 tabIndex），纯 CSS 无法让不可聚焦元素获得焦点；需宿主加 roving tabindex',
     'div[data-row-key="session:normal"][role=treeitem] → tabIndex=' + focusProbe.tabIndex + '（tabindex 属性存在=' + focusProbe.hasTabIndexAttr + '）');
-  t.xfail('(c2) 聚焦后行有可见焦点指示',
+  t.check('(c2) 聚焦后行有可见焦点指示',
     focusProbe.moved && focusProbe.outlineStyle !== 'none' && parseFloat(focusProbe.outlineWidth) > 0,
-    '宿主缺陷：行是 div[role=treeitem] 且不带 tabIndex（整个 workspace bundle 仅搜索框有 tabIndex），纯 CSS 无法让不可聚焦元素获得焦点；需宿主加 roving tabindex',
     'div[data-row-key="session:normal"]:focus-visible → moved=' + focusProbe.moved + ' outline=' + focusProbe.outlineStyle + ' ' + focusProbe.outlineWidth + ' ' + focusProbe.outlineColor);
 
   /* (c3) 菜单可发现：未悬停时 rowActions 是 display:none，而 display:none 的元素不在 Tab 序列里。
@@ -284,9 +283,10 @@ async function rows(t) {
   const reachedRow = order.some((r) => r.rowKey !== null && String(r.rowKey).startsWith('session:'));
   const reachedActions = order.some((r) => r.inActions === true);
   t.log('Tab 序列 ' + JSON.stringify(order.map((r) => r.tag + (r.rowKey ? '[' + r.rowKey + ']' : '') + (r.inActions ? '<actions>' : '') + (r.label ? ':' + r.label : ''))));
-  t.xfail('(c3) Tab 能到达会话行或行内操作按钮（T09「菜单可发现」）',
+  /* (c3) 同样按用户决定保留硬失败：宿主缺陷（.rowActions 默认 display:none，只在 :hover/.menuOpen 露出，
+     无 :focus-within），纯 CSS 修不了，详见 docs/host-proposal-sidebar-keyboard.zh-CN.md */
+  t.check('(c3) Tab 能到达会话行或行内操作按钮（T09「菜单可发现」）',
     reachedRow || reachedActions,
-    '宿主缺陷：.rowActions 默认 display:none，只在 :hover/.menuOpen 露出，无 :focus-within；display:none 元素不在 Tab 序列，键盘打不开行菜单。需宿主补 :focus-within 与可聚焦行',
     'Tab 24 步内到达 session 行=' + reachedRow + '、到达行内操作按钮=' + reachedActions);
 
   /* (d) 长标题：不产生横向溢出。 */
