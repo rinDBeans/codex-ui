@@ -749,6 +749,10 @@ attempt('T14 宿主锚点：皮肤依赖的契约仍存在', () => {
     ['@deepseek-ai/dsh-client-ui-input-trigger/lib/client.js', ['data-trigger-menu']],
     ['@deepseek-ai/dsh-client-ui-approval/lib/client.js', ['data-approval-key']],
     ['@deepseek-ai/dsh-client-ui-user-questions/lib/client.js', ['data-question-key']],
+    /* T10 补做的后续消息队列：皮肤 composer-queue.css 依赖它。
+       归属是实测的 —— QueueDock 渲染代码 jsx("div",{ "data-queue-dock":"" })，
+       与 composer 在同一个包里（dsh-client-ui-conversation），不是独立包。 */
+    ['@deepseek-ai/dsh-client-ui-conversation/lib/client.js', ['data-queue-dock', 'data-composer-input', 'data-composer-composing']],
   ];
   const missing = [];
   const info = [];
