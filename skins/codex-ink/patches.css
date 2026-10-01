@@ -82,7 +82,9 @@ button[aria-disabled="true"],
 }
 
 /* ④ 卡片：描边即层级 */
-[data-slot="web-ui.plugin.item"] > *,
+/* 0.7.2 订正：这里原有 [data-slot="web-ui.plugin.item"] > *，全宿主 1043 个 js/css 文件 0 命中
+   （slot 走 ctx.slots.register 注册，字面量 "web-ui." 也 0 命中），已删。
+   同组的 [data-dsh-part=*] 是皮肤自己的适配器锚点，不是宿主发出的，保留。 */
 [data-dsh-part="card"],
 [data-dsh-part="column"],
 [data-dsh-part="status"],

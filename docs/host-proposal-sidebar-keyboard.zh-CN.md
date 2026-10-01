@@ -46,8 +46,20 @@
 
 ## 4. 皮肤侧现状
 
-对应断言已记为 **XFAIL**（不是 FAIL，也不删除）：
-`ALL PASS (331/331, 3 条 XFAIL)`。宿主修好后它们会自动转 PASS 并从汇总中消失，无需改动本仓库。
+对应断言在 `scripts/specs/sidebar-keyboard.mjs`，**一条没删**，通过 `verify.mjs` 的 `OPT_IN` 排除在默认全量之外。
+
+- 显式跑会如实报红并 `exit 1`（这是**预期**行为，不是回归）：`node scripts/verify.mjs sidebar-keyboard`
+- 默认全量 `npm run verify` 不含本 spec，汇总末尾会打印「本次未计入汇总的排除项」把这件事显式说出来
+- 宿主修好后：从 `OPT_IN` 里移出 `sidebar-keyboard` 即自动计入全量
+
+判据本身在 0.7.2 按本提案的修法重新对齐过（独立审查发现原判据比缺陷还苛刻）：
+
+| 断言 | 判据 | 为什么这么写 |
+| --- | --- | --- |
+| c1 | `focus()` 后焦点是否真的落到该行 | 提案修法 1/2（容器 `tabindex=0`+`aria-activedescendant`，或 roving tabindex）落地后**行本身**的 `tabIndex` 仍是 -1；按 tabIndex 判会永远红，等于要求宿主做错方案 |
+| c2 | 真实 Tab 之后量焦点指示 | 程序化 `focus()` 前页面无键盘输入，`:focus-visible` 按规范不匹配，宿主修好也量不到 |
+| c3a | Tab 能到达会话行 | — |
+| c3b | Tab 能到达行内操作按钮 | 原 c3 是 `reachedRow || reachedActions` 的「或」，会在只修行、不给 `.rowActions` 加 `:focus-within` 时假绿 —— 菜单对键盘用户仍不可达而判据说通过。§3 的 1 与 2 缺一不可，判据也必须缺一不可 |
 
 ## 5. 复现方式
 

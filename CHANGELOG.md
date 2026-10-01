@@ -5,9 +5,53 @@
 ## Unreleased - 2026-10-01
 
 A design-system audit pass across the composer, sidebar, right panel, appearance controls and the command
-surface. At the end of it `npm run check` reports **86** checks and `npm run verify` **360** assertions;
+surface. At the end of it `npm run check` reports **86** checks and `npm run verify` **358** assertions
+(down from 360 after an independent review: three self-certifying criteria that tested dead CSS were dropped
+and one criterion targeting a real host anchor was added — the decrease is an honest decrease);
 every figure quoted below, and every row of the README's fixture table, comes from a real run on this
 machine rather than from a hand-maintained list.
+
+### ⓪ Independent-review pass: 6 dead CSS rules, one hollow guard, 4 self-certifying criteria
+
+An external review reported findings that were each reproduced against the host bundles on this machine before
+any change was made.
+
+**6 dead CSS rules** (selectors that can never match):
+
+- `content.css` `[data-tone="warn"]` — the host `ToolDetails.badge` tone enum is
+  `info/neutral/success/warning/error`; there is no `warn`, so warning badges never picked up the warning colour.
+  Fixed to `warning`. The *token* name stays `--dsw-alias-state-warn-*` (7 host occurrences, 0 for `-warning-`):
+  the attribute value and the token name must not be changed together.
+- `[data-turn-process-chevron]` (×2) and `[data-turn-process-body]` (×2) — the host chat bundle only emits
+  `-answer / -hidden / -inline / -member / -messages / -subagents / -tool-calls`. Removed.
+- `[data-turn-process][data-expanded="false"]` — the host writes `expanded || void 0`, i.e. attribute-absence
+  semantics (its own CSS uses `:not([data-expanded])`); `="false"` never appears. Removed.
+- `patches.css` `[data-slot="web-ui.plugin.item"]` — 0 hits across all 1043 host js/css files. Removed.
+- `model-picker.css` `[data-disabled="true"]` — no writer in `src/` or the host. Removed.
+
+**Hollow guard**: `check.mjs` 9b computed a `proposals` variable that only ever reached the return string, never
+an `assert` — so the "every exclusion needs a proposal doc" rule it advertises in a comment was not actually
+enforced. It now asserts a non-zero proposal count, one-to-one correspondence between exclusions and
+proposal files, and reverse-reports orphan proposals; the "has assertions" test now looks for real call sites on
+non-comment lines. `verify.mjs` now prints the excluded specs at the end of its summary so the exclusion itself
+leaves a trace. Two negative tests: deleting the proposal doc, and renaming the 4 `t.check(` calls — both
+turn the guard red as intended.
+
+**4 self-certifying criteria** (a criterion that passes because of its own bug is worse than a lax one):
+
+- `content.mjs` hand-wrote `data-turn-process-chevron` / `-body` in its fixture — attributes the host never emits —
+  which is exactly how the dead CSS above survived. Switched to the real `-hidden / -member / -messages`, and the
+  `pre` probe moved to `[data-tool]` (the turn-summary region holds no `<pre>`; the host bundle has 0 `pre`
+near `turn-process`). Three criteria that only held because of the dead CSS were dropped, and one checking that
+collapsing is the host's `-hidden` responsibility was added.
+- `sidebar-keyboard.mjs` c1 judged `tabIndex >= 0`, but both fixes the proposal endorses (container
+  `tabindex=0` + `aria-activedescendant`, or roving tabindex) leave the row's own `tabIndex` at -1 — a criterion
+  stricter than the defect. It now judges whether focus actually lands on the row after `focus()`.
+- c2 measured immediately after a programmatic `focus()`, when the page has had no keyboard interaction and
+  `:focus-visible` correctly does not match; it now measures after a real Tab sequence.
+- c3 was `reachedRow || reachedActions`, which would go green when the host adds row focus but not
+  `.rowActions { :focus-within }` — the menu still unreachable by keyboard while the criterion says pass. Split
+  into c3a (reaches the row) and c3b (reaches the in-row button); both are required, matching the proposal.
 
 ### ⑭ The follow-up queue is pulled into the composer card's family
 

@@ -146,7 +146,7 @@ node scripts/build.mjs --check   # 只比对产物是否过期，不落盘
 | 命令 | 覆盖 | 前置 |
 |---|---|---|
 | `npm run check` | 语法、JSON、清单与 `peerDependencies`、产物与源码同源、`client.js` 的 DSH 插件契约（隔离执行一遍）、作用域化、覆盖层与功率轨纯函数、36 组 WCAG、彩色白名单、编码、双语文档成对、机器专属路径、设置模态框契约（源文件 / 作用域化 / 宿主锚点优先 / 装配），86 项 | 无 |
-| `npm run verify` | 全部夹具，360 项（见下表） | 宿主包 + Chromium |
+| `npm run verify` | 全部夹具，358 项（见下表） | 宿主包 + Chromium |
 | `node scripts/live/gui.mjs --url <带 token 的 URL>` | 真 GUI：阴影与两条分界线，加模型位 —— B 面开着时 14 项（顶替、几何、键盘改档写进宿主 store 并改回），关着时 10 项（A 面 pending 窗口；`--latency` 默认给往返加 800ms，本机往返 <60ms 采不到） | `dsh web` 实例 |
 | `node scripts/live/settings.mjs --url <…>` | 真 GUI：组合包页设置卡、9 行结构、默认不覆盖、开关与强调色写入、模型选择器关掉后宿主那一格复原、刷新后仍在、主题切换逐帧无中间帧；结束时全部重置，30 项 | 同上（profile 需启用插件管理） |
 | `node scripts/live/settings-modal.mjs --url <…>` | 真 GUI：㉑ 的结构层与视觉层一起验 —— 分组侧栏、「← 返回应用」行、搜索过滤、分组标题、宿主节点同一性（不搬移不克隆），以及宿主重写 `className` 后仍生效的属性优先隐藏。需要启用了插件管理的真 `dsh web`；`--explore` 只导结构不断言 | 同上 |
@@ -159,7 +159,7 @@ node scripts/build.mjs --check   # 只比对产物是否过期，不落盘
 |---|---|---|---|
 | `appearance` | appearance | 外观色块的**选中**态读皮肤 `--dsw-alias-label-primary`（宿主停在 `rgb(173, 178, 184)`）；字号步进器圆角读 `--dsw-radius-s`（宿主停在 `12px`）；字号改动穿透到皮肤正文令牌（21px → 25px）且还原路径可回；步进器箭头在键盘聚焦时仍露出 | 13 |
 | `composer` | composer-shadow · hero | ⑱ 输入卡阴影**按实测像素拟合**（两层：环 + 近场；逐层几何与 alpha、暗色 inset、宽窄屏一致、渲染像素）；⑬⑭⑰ 与焦点环、顶栏两格放开、徽标配色与圆角改读令牌计算值 | 21 + 26 |
-| `content` | state_tiers · variants · expandable · turn_process · reduced_motion · waiting · reference | ⑲ 工具卡：三档状态、七档 `data-variant` 分组、可展开详情、回合摘要/详情层级、等待态（审批 / 提问 / 目标 / 命令输入）、reduced-motion，以及引用菜单的组标题 | 12 + 12 + 6 + 8 + 2 + 11 + 12 |
+| `content` | state_tiers · variants · expandable · turn_process · reduced_motion · waiting · reference | ⑲ 工具卡：三档状态、七档 `data-variant` 分组、可展开详情、回合摘要/详情层级（收起态由宿主自己的 `data-turn-process-hidden` 承担；摘要行不装 `<pre>`，代码块在 `[data-tool]` 上取样）、等待态（审批 / 提问 / 目标 / 命令输入）、reduced-motion，以及引用菜单的组标题 | 12 + 12 + 6 + 6 + 2 + 11 + 12 |
 | `elevation` | elevation | ⑲ `--dsw-elevation-*` 与 Codex 源码对账，外加渲染出的菜单面板 | 19 |
 | `model-picker` | host-menu · power-rail | ⑫ A 面宿主菜单与 pending 指示器；⑳ B 面：席位顶替与复原、几何、拖动中不提交 / 松手对齐提交一次、慢往返不回弹且转圈、键盘四键、焦点环、Escape、换模型带默认档、失败提示、**顶档紫色点阵**（5 行、8 档色调桶、相位 hash 散开、羽化、两条关动效口子）、reduced-motion、深色、开关。假目录按**安装中的**宿主形状写（快照里没有 `pending`） | 20 + 62 |
 | `panels` | panels | ②d 右栏滚动区并入皮肤的 `::-webkit-scrollbar` 规则（8px、thumb 取皮肤滚动条令牌）；空态与不可用态本就解析到皮肤令牌；文件**不含后代通配符** | 12 |

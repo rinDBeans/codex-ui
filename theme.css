@@ -435,7 +435,6 @@ html[data-codex-ui] [aria-disabled="true"] {
   opacity: 0.45;
 }
 
-html[data-codex-ui] [data-slot="web-ui.plugin.item"] > *,
 html[data-codex-ui] [data-dsh-part="card"],
 html[data-codex-ui] [data-dsh-part="column"],
 html[data-codex-ui] [data-dsh-part="status"],
@@ -868,7 +867,7 @@ html[data-codex-ui] [data-tone="error"] {
   color: var(--dsw-alias-state-error-primary);
 }
 
-html[data-codex-ui] [data-tone="warn"] {
+html[data-codex-ui] [data-tone="warning"] {
   color: var(--dsw-alias-state-warn-primary);
 }
 
@@ -901,7 +900,6 @@ html[data-codex-ui] [data-sample][data-expandable][aria-expanded="true"] {
 
 html[data-codex-ui] [data-tool] pre,
 html[data-codex-ui] [data-sample] pre,
-html[data-codex-ui] [data-turn-process-body] pre,
 html[data-codex-ui] [data-turn-process-messages] pre {
 
   font-family: var(--dsw-font-meta);
@@ -914,11 +912,6 @@ html[data-codex-ui] [data-turn-process] {
   color: var(--dsw-alias-label-primary);
 }
 
-html[data-codex-ui] [data-turn-process-chevron] {
-  color: var(--dsw-alias-label-tertiary);
-  transition: transform var(--dsw-motion-fast) var(--dsw-ease);
-}
-
 html[data-codex-ui] [data-turn-process-messages],
 html[data-codex-ui] [data-turn-process-tool-calls] {
   color: var(--dsw-alias-label-secondary);
@@ -927,10 +920,6 @@ html[data-codex-ui] [data-turn-process-tool-calls] {
 
 html[data-codex-ui] [data-turn-process-answer] {
   color: var(--dsw-alias-label-primary);
-}
-
-html[data-codex-ui] [data-turn-process][data-expanded="false"] [data-turn-process-body] {
-  display: none;
 }
 
 html[data-codex-ui] [data-error],
@@ -1035,10 +1024,6 @@ html[data-codex-ui] [data-composer-chip] [class$="_path"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html[data-codex-ui] [data-turn-process-chevron] {
-    transition-duration: 0.01ms;
-  }
-
   html[data-codex-ui] [data-tool][data-expandable],
 html[data-codex-ui] [data-sample][data-expandable] {
     transition-duration: 0.01ms;
@@ -1364,10 +1349,6 @@ html[data-codex-ui] .codex-mp-root[data-armed="true"] {
 html[data-codex-ui] .codex-mp-root[data-dragging="true"],
 html[data-codex-ui] .codex-mp-root[data-dragging="true"] .codex-mp-tick {
   cursor: grabbing;
-}
-
-html[data-codex-ui] .codex-mp-root[data-disabled="true"] {
-  opacity: 0.6;
 }
 
 html[data-codex-ui] .codex-mp-popover[data-reduced-motion="true"] .codex-mp-root {

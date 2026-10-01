@@ -913,12 +913,36 @@ attempt('可选 spec：排除项存在、有断言、且有宿主提案归口', 
     const file = join(ROOT, 'scripts', 'specs', name + '.mjs');
     if (!fs.existsSync(file)) { bad.push(name + '（spec 不存在，OPT_IN 写错了名字）'); continue; }
     const src = fs.readFileSync(file, 'utf8');
-    if (!/t\.(check|attempt)\(/.test(src)) bad.push(name + '（没有任何断言，是个空壳）');
+    // 断言必须落在**调用点**上：只匹配 t.check( 会被注释或字符串里的同名字样骗过，
+    // 所以这里同时要求至少有一处非注释的调用（0.7.2 补强）。
+    const realCalls = src.split(/\r?\n/).filter((l) => {
+      const t = l.trim();
+      return !t.startsWith('*') && !t.startsWith('//') && /\bt\.(check|attempt)\(/.test(l);
+    });
+    if (realCalls.length === 0) bad.push(name + '（没有任何真实断言调用，是个空壳）');
     if (!/host-proposal/.test(src)) bad.push(name + '（没在文件里引用 host-proposal，缺归口）');
   }
-  const proposals = listFiles(join(ROOT, 'docs'), ['.md']).filter((f) => /host-proposal/.test(f.split(/[\\/]/).pop()));
+  // ③ 真正落地：每个排除项都要能在 docs/ 里点名到一份专属提案文件。
+  //    0.7.2 补强 —— 之前 proposals 只出现在返回字符串里，assert 完全没管它，
+  //    注释宣称的「必须在 docs/ 里有对应提案」在代码里是空的。
+  const proposals = listFiles(join(ROOT, 'docs'), ['.md'])
+    .map((f) => f.split(/[\\/]/).pop())
+    .filter((f) => /host-proposal/i.test(f));
+  assert(proposals.length > 0, 'docs/ 下没有任何 host-proposal 文档 —— 排除项失去归口，把 OPT_IN 清空或补上提案');
+  for (const name of names) {
+    const stem = name.replace(/[^a-z0-9-]/gi, '-');
+    const hit = proposals.some((p) => p.toLowerCase().includes(stem.toLowerCase()));
+    if (!hit) bad.push(name + '（docs/ 里没有专属的 host-proposal-' + stem + '*.md，无法归口）');
+  }
+  // 反向：孤儿提案（docs 有、OPT_IN 没排除）说明有人忘了把它从默认全量里摘出去。
+  for (const p of proposals) {
+    const stem = p.replace(/^host-proposal-/i, '').replace(/\.zh-CN\.md$|\.md$/i, '').replace(/[^a-z0-9-]/gi, '-');
+    if (stem && !names.includes(stem) && !names.some((n) => stem.includes(n) || n.includes(stem))) {
+      bad.push(p + '（有提案但不在 OPT_IN 里 —— 宿主修好后请把它移出排除表）');
+    }
+  }
   assert(bad.length === 0, bad.join('；'));
-  return names.length + ' 个排除项 · 提案 ' + proposals.length + ' 份：' + names.join(' ');
+  return names.length + ' 个排除项 · 提案 ' + proposals.length + ' 份（一一对应）：' + names.join(' ');
 });
 /* ── 10. 文本编码 ─────────────────────────────────────────────────────── */
 attempt('文本为无 BOM 的 UTF-8', () => {

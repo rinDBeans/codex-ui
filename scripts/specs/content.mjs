@@ -208,31 +208,39 @@ ${toolRow('bash', 'bash', 'ok', true)}
 <style>${t.theme()}</style>
 <style>body{margin:0;font:14px/1.6 "Segoe UI","Microsoft YaHei",sans-serif;background:var(--dsw-alias-bg-base)}</style>
 </head><body>
-<div data-turn-process data-expanded="true">
-  <span data-turn-process-chevron>▸</span>
+<!-- 0.7.2 订正：本夹具原先手写了 data-turn-process-chevron / data-turn-process-body，
+     宿主**从不产出**这两个属性（dsh-client-ui-chat bundle 实际产出的只有
+     -answer / -hidden / -inline / -member / -messages / -subagents / -tool-calls）。
+     照着不存在的属性写夹具，等于对着自己造的假 DOM 自证，皮肤里那几条死 CSS
+     正是这样活下来的。收起语义用宿主的 data-turn-process-hidden。
+     pre 也从 -body 挪到真实的宿主位置 [data-tool]（回合摘要区不装 <pre>）。 -->
+<div data-tool data-variant="bash" data-state="ok"><pre>const a = 1;</pre></div>
+<div data-turn-process>
   <span data-turn-process-messages>调用了 2 个工具</span>
   <span data-turn-process-tool-calls>read · grep</span>
-  <div data-turn-process-body><pre>const a = 1;</pre></div>
+  <div data-turn-process-member><pre>const a = 1;</pre></div>
   <div data-turn-process-answer>完成</div>
 </div>
-<div data-turn-process data-expanded="false">
-  <span data-turn-process-chevron>▸</span>
-  <div data-turn-process-body><pre>不该显示</pre></div>
+<div data-turn-process data-turn-process-hidden>
+  <div data-turn-process-member><pre>不该显示</pre></div>
 </div>
 </body></html>`, 400);
 
     const probe = await page.evaluate(() => {
       const q = (s) => document.querySelector(s);
       const cs = (el, p) => (el === null ? null : getComputedStyle(el).getPropertyValue(p));
-      const closedBody = q('[data-expanded="false"] [data-turn-process-body]');
-      const openPre = q('[data-expanded="true"] pre');
-      const ocs = openPre === null ? null : getComputedStyle(openPre);
+      const hidden = q('[data-turn-process-hidden]');
+      // 代码块取样放在**工具行**里：宿主 dsh-client-ui-chat 的 turn-process 一族
+      // （-messages/-tool-calls/-answer/-member/-subagents）全是摘要按钮上的计数属性，
+      // 该区域不装 <pre>（bundle 内 turn-process 附近 pre 出现 0 次）。
+      // pre 的真实宿主是 [data-tool] / [data-sample] 的输出正文，见 expandable 小节。
+      const toolPre = q('[data-tool] pre') || q('[data-sample] pre');
+      const ocs = toolPre === null ? null : getComputedStyle(toolPre);
       return {
         summaryColor: cs(q('[data-turn-process-messages]'), 'color'),
         answerColor: cs(q('[data-turn-process-answer]'), 'color'),
-        chevronColor: cs(q('[data-turn-process-chevron]'), 'color'),
-        chevronTransition: cs(q('[data-turn-process-chevron]'), 'transition-property'),
-        closedBodyDisplay: closedBody === null ? null : getComputedStyle(closedBody).display,
+        hiddenDisplay: hidden === null ? null : getComputedStyle(hidden).display,
+        hiddenAttrPresent: hidden !== null,
         preFont: ocs === null ? null : ocs.fontFamily,
         preOverflowX: ocs === null ? null : ocs.overflowX,
         preWhiteSpace: ocs === null ? null : ocs.whiteSpace,
@@ -243,11 +251,13 @@ ${toolRow('bash', 'bash', 'ok', true)}
     t.check('详情块（answer）用主前景（高频细读）',
       probe.answerColor !== null && probe.answerColor !== probe.summaryColor,
       `answer ${probe.answerColor} vs summary ${probe.summaryColor}`);
-    t.check('chevron 用辅助色（结构件不抢戏）', probe.chevronColor !== null && /\d/.test(probe.chevronColor), probe.chevronColor);
-    t.check('chevron 有旋转过渡（展开反馈）', probe.chevronTransition.includes('transform'), probe.chevronTransition);
-    t.check('收起态的详情块不占位（display:none，无空白块）',
-      probe.closedBodyDisplay === 'none', String(probe.closedBodyDisplay));
-    /* 代码块：等宽 + 横向滚动 + 不折行 —— 折行后无法逐字比对命令与 JSON。 */
+    /* 0.7.2：原先「chevron 用辅助色 / chevron 有旋转过渡 / 收起态 display:none」三条
+       测的都是宿主不存在的属性，已随死 CSS 一并撤下。收起态由宿主自己的
+       data-turn-process-hidden 负责折叠（其 CSS 在宿主 bundle 内），皮肤不重复实现。 */
+    t.check('收起态由宿主的 data-turn-process-hidden 标记（皮肤不自己造锚点）',
+      probe.hiddenAttrPresent, '宿主实际产出的是 -hidden，夹具里出现=' + probe.hiddenAttrPresent);
+    /* 代码块：等宽 + 横向滚动 + 不折行 —— 折行后无法逐字比对命令与 JSON。
+       取样元素改为 [data-turn-process-member] 内的 pre（原取 -body，已随死 CSS 删除）。 */
     t.check('代码块等宽', probe.preFont !== null && /monospace|Consolas|Menlo|Courier/i.test(probe.preFont), probe.preFont);
     t.check('代码块横向滚动（overflow-x: auto）', probe.preOverflowX === 'auto', String(probe.preOverflowX));
     t.check('代码块不折行（white-space: pre）', probe.preWhiteSpace === 'pre', String(probe.preWhiteSpace));
@@ -260,23 +270,25 @@ ${toolRow('bash', 'bash', 'ok', true)}
 <style>${t.theme()}</style>
 <style>body{margin:0;font:14px/1.6 "Segoe UI",sans-serif}</style></head><body>
 ${toolRow('bash', 'bash', 'ok', true)}
-<div data-turn-process data-expanded="true"><span data-turn-process-chevron>▸</span></div>
+<div data-turn-process><span data-turn-process-member>▸</span></div>
 </body></html>`, 400);
     await page.media({ 'prefers-reduced-motion': 'reduce' });
     await t.sleep(200);
     const probe = await page.evaluate(() => ({
       expDur: getComputedStyle(document.querySelector('[data-expandable]')).transitionDuration,
-      chevDur: getComputedStyle(document.querySelector('[data-turn-process-chevron]')).transitionDuration,
+      memberDur: getComputedStyle(document.querySelector('[data-turn-process-member]')).transitionDuration,
     }));
     /* 浏览器把 0.01ms 序列化成 "1e-05s"（不是 "0.01ms"），所以必须按数值比，
        字符串匹配会永远判 FAIL。判据是「非 0 且极小」—— none 是 0s，会被排除在外。 */
     const secs = (s) => String(s).split(',').map((x) => parseFloat(x) || 0).reduce((m, x) => Math.max(m, x), 0);
     const expSec = secs(probe.expDur);
-    const chevSec = secs(probe.chevDur);
+    const memberSec = secs(probe.memberDur);
     t.check('reduced-motion 下展开卡过渡被压到 ~0.01ms（不是 none，宿主靠 transitionend 摘标记）',
       expSec > 0 && expSec <= 0.00001, probe.expDur + ' → ' + expSec + 's');
-    t.check('reduced-motion 下 chevron 过渡同样被压掉',
-      chevSec > 0 && chevSec <= 0.00001, probe.chevDur + ' → ' + chevSec + 's');
+    /* 0.7.2：原判据量 [data-turn-process-chevron]，宿主无此属性，探针恒为 '0s' → 永远 FAIL。
+       换成宿主真实产出的 [data-turn-process-member]（该元素同样落在 reduced-motion 作用域内）。 */
+    t.check('reduced-motion 下回合详情成员块过渡同样被压掉',
+      memberSec > 0 && memberSec <= 0.00001, probe.memberDur + ' → ' + memberSec + 's');
   },
 
   /* ─── ⑲·7b 审批 / 提问：等待态必须与"进行中"区分 ─── */

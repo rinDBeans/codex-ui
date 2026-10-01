@@ -32,7 +32,7 @@ codex-ui 是一个 **DSH 宿主插件**（不是独立客户端）：它用 CSS 
 
 ```powershell
 npm run check     # ALL PASS (86/86)   —— 不依赖宿主，CI 入口
-npm run verify    # ALL PASS (360/360) —— 需要 DSH_CHROME 环境变量
+npm run verify    # ALL PASS (358/358) —— 需要 DSH_CHROME 环境变量
 ```
 
 `verify` 需要 `DSH_CHROME` 指向一个 Chromium（Playwright 缓存里那个即可）。
@@ -68,7 +68,7 @@ npm run verify    # ALL PASS (360/360) —— 需要 DSH_CHROME 环境变量
 
 | 任务 | 判断 | 依据文档 |
 |---|---|---|
-| T09 侧栏 | 搜索/长名遮罩/归档/置顶/行菜单/宽度控制**宿主全有**，皮肤只做视觉映射 | （无独立文档，见 `skins/codex-ink/sidebar-rows.css` 注释） |
+| T09 侧栏 | 搜索/长名遮罩/归档/置顶/宽度控制**宿主全有**，皮肤只做视觉映射。**行菜单只有悬停 ⋯ 入口，宿主侧栏行没有右键菜单**（`onContextMenu` 只在 documentpreview/terminal/trajectory 出现，workspace 侧栏行没有） | （无独立文档，见 `skins/codex-ink/sidebar-rows.css` 注释） |
 | T10 输入区 | 多行/超长/中文 IME/发送键/附件/队列/提及**宿主全有** | `docs/codex-ui-t10-verdict.zh-CN.md` |
 | T11 右栏 | 容器/页头/空态/不可用态**宿主已满足**，唯一缺口是滚动区 | `scripts/specs/panels.mjs` |
 | T12 命令 | **无专属锚点**，不可在皮肤层实现 | `docs/codex-ui-t12-verdict.zh-CN.md` |
@@ -180,6 +180,9 @@ node scripts/verify.mjs sidebar-keyboard   # 单独看那条已知缺口
 | `git add -A` 把草稿探测脚本 `.t11-recon.mjs` 提交进了仓库根 | 已移除，并加 `.gitignore` 规则 `/.*.mjs` |
 | 两个子代理同时写同一对文件，产出两条**互斥断言**且互相覆盖 | 已收口；此后写作用域互斥到文件级、每文件只派一个写者 |
 | 注释里引用了一张复现不出来的「实测表」 | 已删除，改为只保留可测结论 + 明说「本环境无法像素判定」 |
+| **6 处死 CSS**（外部独立审查逐条回宿主 bundle 核对后报出）：`content.css` 的 `[data-tone="warn"]` 宿主枚举是 `warning`；`[data-turn-process-chevron]`/`[data-turn-process-body]` 宿主从不发出；`[data-expanded="false"]` 与「属性缺席」语义相悖；`patches.css` 的 `[data-slot="web-ui.plugin.item"]` 全宿主 0 命中；`model-picker.css` 的 `data-disabled` 无写入点 | 0.7.2 全部处理：`warn`→`warning`（**注意令牌名仍是 `--dsw-alias-state-warn-*`，宿主 7 处、`-warning-` 0 处，两者不可一起改**），其余 5 处删除并在原位留下订正注释 |
+| `check.mjs` 9b 护栏的 `proposals` 变量算完只进了返回字符串，**从未进入 `assert`** —— 注释宣称的「必须在 docs/ 里有对应提案」在代码里是空的 | 0.7.2 补真实断言：提案数 > 0、排除项与提案文件一一对应、孤儿提案反向报出；断言检测改为「非注释行里的真实调用」，并做了两次反向验证（删提案文档、把 4 个 `t.check(` 改名）均如期报红 |
+| `sidebar-keyboard` 三条判据与提案自己的修复菜单不匹配 | 0.7.2 重写：c1 改为「focus() 后焦点是否真的落到行」（roving tabindex 下行自身 tabIndex 恒为 -1，原判据永远红）、c2 延后到真实 Tab 之后量（`:focus-visible` 需要真实键盘交互）、c3 拆成 c3a/c3b 两条（原「或」判据在只修行不加 `:focus-within` 时会假绿） |
 
 ---
 
@@ -191,9 +194,11 @@ node scripts/verify.mjs sidebar-keyboard   # 单独看那条已知缺口
 | 宿主包根 | `<npm 全局 node_modules>/@deepseek-ai/dsh/node_modules/@deepseek-ai/` |
 | 构建 | `node scripts/build.mjs`；产物 `theme.css` + `client.js`，**勿手改** |
 | `SKIN_PARTS` | 16 个 CSS 分片，顺序即层叠顺序（`scripts/build.mjs:24-39`） |
-| `check` 护栏 | 50 处 `attempt`/`check` |
+| `check` 护栏 | 50 处 `attempt`/`check`（0.7.2 给 9b 补了真实断言，未新增护栏条数） |
 | `verify` spec | `scripts/specs/*.mjs` 共 13 个，按文件名**自动发现** |
 | 产物同步 | `node scripts/build.mjs --check` 可确认 `theme.css`/`client.js` 与源码同源 |
 
 > ⚠️ **`verify` 按文件名自动发现 spec** —— 新增 `scripts/specs/*.mjs` 会自动进入默认全量，
-> 无需改 `verify.mjs`。但若某条 spec **预期失败**，必须显式加进 `OPT_IN`，否则会拉红 CI。
+> 无需改 `verify.mjs`。但若某条 spec **预期失败**，必须显式加进 `OPT_IN`，否则本机默认全量会报红。
+> （0.7.2 订正：原稿写「会拉红 CI」不准确 —— `.github/workflows/ci.yml` 只跑 `check`，不跑 `verify`，
+> CI 不受 OPT_IN 影响。`check` 侧的 9b 护栏才是 `OPT_IN` 唯一的机器约束，0.7.2 已给它补上真实断言。）

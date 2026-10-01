@@ -114,4 +114,19 @@ console.log('\n━━ 汇总（截图在 ' + shots + '）');
 for (const [spec, section, pass, total] of table) {
   console.log('  ' + (pass === total ? 'PASS' : 'FAIL') + '  ' + (spec + ' / ' + section).padEnd(32) + pass + '/' + total);
 }
+/* 排除项必须留痕：默认全量跑完是绿的，但「绿」的前提是有一批断言没进这个数字。
+   静默排除等于把失败藏起来，所以每次都把被摘出去的 spec、条数与归口文档打出来。 */
+const skipped = available.filter((n) => OPT_IN.has(n) && !named.includes(n));
+if (skipped.length > 0) {
+  console.log('\n  ⓘ 本次未计入汇总的排除项（断言一条没删，根因在宿主）：');
+  for (const name of skipped) {
+    let count = 0;
+    try {
+      const mod = await import(pathToFileURL(join(SPEC_DIR, name + '.mjs')).href);
+      count = Object.keys(mod.default ?? {}).length;
+    } catch { count = 0; }
+    console.log('     · ' + name + '（' + count + ' 个小节）— node scripts/verify.mjs ' + name + ' 单独看现状');
+  }
+  console.log('     归口：docs/host-proposal-*.md ｜ 宿主修好后从 verify.mjs 的 OPT_IN 里移出即自动计入');
+}
 summarize(all);

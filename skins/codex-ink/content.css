@@ -75,7 +75,10 @@ html[data-codex-ui] [data-tone="error"] {
   color: var(--dsw-alias-state-error-primary);
 }
 
-html[data-codex-ui] [data-tone="warn"] {
+/* tone 的宿主枚举是 info/neutral/success/warning/error —— 是 warning 不是 warn（0.7.2 订正：
+   之前写成 [data-tone="warn"]，整条永不命中，警告徽标一直吃不到警告色）。
+   注意属性值是 warning，令牌名却是 --dsw-alias-state-warn-*（宿主 7 处，-warning- 0 处），两者不要一起改。 */
+html[data-codex-ui] [data-tone="warning"] {
   color: var(--dsw-alias-state-warn-primary);
 }
 
@@ -115,7 +118,6 @@ html[data-codex-ui] [data-sample][data-expandable][aria-expanded="true"] {
    判据：命令与 JSON 折行后无法逐字比对；Markdown 正文由宿主 renderer 负责排版，不在此干预。 */
 html[data-codex-ui] [data-tool] pre,
 html[data-codex-ui] [data-sample] pre,
-html[data-codex-ui] [data-turn-process-body] pre,
 html[data-codex-ui] [data-turn-process-messages] pre {
   /* --dsw-font-code **不存在**（skin.css 只有 --dsw-font-meta = var(--ds-font-family-code)）；
      写成不存在的令牌会被浏览器丢弃整条声明，代码块静默回落 UI 字体。实测过，别改回去。 */
@@ -132,11 +134,6 @@ html[data-codex-ui] [data-turn-process] {
   color: var(--dsw-alias-label-primary);
 }
 
-html[data-codex-ui] [data-turn-process-chevron] {
-  color: var(--dsw-alias-label-tertiary);
-  transition: transform var(--dsw-motion-fast) var(--dsw-ease);
-}
-
 html[data-codex-ui] [data-turn-process-messages],
 html[data-codex-ui] [data-turn-process-tool-calls] {
   color: var(--dsw-alias-label-secondary);
@@ -147,12 +144,6 @@ html[data-codex-ui] [data-turn-process-tool-calls] {
    摘要行可以被扫过，答案不能。 */
 html[data-codex-ui] [data-turn-process-answer] {
   color: var(--dsw-alias-label-primary);
-}
-
-/* 详情默认收起由宿主控制（data-expanded / data-collapsed-summary）；
-   本层只保证收起时不留空白块。 */
-html[data-codex-ui] [data-turn-process][data-expanded="false"] [data-turn-process-body] {
-  display: none;
 }
 
 /* ⑲·6 失败 / 不可用：宿主用 data-error 与 data-unavailable 标记，
@@ -314,13 +305,11 @@ html[data-codex-ui] [data-composer-chip] [class$="_path"] {
   font-family: var(--dsw-font-meta);
 }
 
-/* ⑲·8 reduced-motion：⑲·3 的 chevron 旋转与背景过渡都要能被关掉。
-   宿主靠 transitionend 摘 data-animating，所以用 0.01ms 而不是 none（与 patches.css ⑪ 同理）。 */
+/* ⑲·8 reduced-motion：可展开行的背景过渡要能被关掉。
+   宿主靠 transitionend 摘 data-animating，所以用 0.01ms 而不是 none（与 patches.css ⑪ 同理）。
+   0.7.2 订正：这里原有 [data-turn-process-chevron] 的 transition-duration —— 宿主不发该属性，
+   整条永不命中；回合摘要的展开态是 [data-turn-process] 属性缺席语义，也不做旋转过渡。 */
 @media (prefers-reduced-motion: reduce) {
-  html[data-codex-ui] [data-turn-process-chevron] {
-    transition-duration: 0.01ms;
-  }
-
   html[data-codex-ui] [data-tool][data-expandable],
   html[data-codex-ui] [data-sample][data-expandable] {
     transition-duration: 0.01ms;

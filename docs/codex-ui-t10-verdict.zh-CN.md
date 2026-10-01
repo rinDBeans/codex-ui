@@ -13,13 +13,13 @@
 
 | 方案 §6.2 要求 | 宿主实况 | 锚点 / 证据 |
 |---|---|---|
-| 多行 / 超长 prompt | **已满足** | `dsh-client-ui-conversation/lib/client.js` 的 `editor.module.css`：`min-height:44px; overflow-wrap:anywhere`，编辑区 `[data-composer-input]` 为 `contentEditable` + `role=textbox` |
+| 多行 / 超长 prompt | **已满足** | `dsh-client-ui-conversation/client.js` 的 `uV2eYG_input`（InputBar 侧）：`min-height:36px`，hero 态 `min-height:52px`，另有 `overflow-wrap:anywhere`；编辑区 `[data-composer-input]` 为 `contentEditable` + `role=textbox`（0.7.2 订正：原稿写的「editor.module.css 的 min-height:44px」有误，44px 不是输入区的值） |
 | 中文 IME（`event.isComposing` 期间不发送） | **已满足** | `registerComposerKeymap()` 在 `compositionstart/end` 上 `toggleAttribute("data-composer-composing")`；宿主 CSS 已有 `.input[data-composer-composing] p:last-child:after{content:none}` 与 `+.placeholder{visibility:hidden}` |
 | 发送键策略 | **已满足** | 宿主 `EnterBehaviorRow` 模块（按宿主设置），皮肤只把发送键画成墨色圆点，未改语义 |
 | 附件 | **已满足** | `dsh-client-ui-attachment`（`data-variant` 区分形态）；队列侧 `QueueDock` 也有 `attachments`/`file`/`fileIcon` |
 | follow-up queue / steer | **已满足** | `data-queue-dock`（`QueueDock.module.css`），含 `pendingRow`/`preview`/`actions`；皮肤未接管其语义 |
 | 提及 / 引用建议 | **已满足** | `dsh-client-ui-input-trigger` 的 `data-trigger-menu` + `data-overflow-below`；皮肤 `composer.css` ⑭·4 只调材质与宽度 |
-| 工作区数据 | **已满足** | hero 行 `_heroWorkspaceRow`，皮肤只调几何 |
+| 工作区数据 | **已满足** | hero 行 CSS 模块类名 `_heroWorkspaceRow`（`heroWorkspaceRow` 是去掉下划线的那一侧标识符，宿主 client.js 里两者都有，CSS 选择器用的是带下划线的），皮肤只调几何 |
 
 ## 3. 保留组件未受影响（T10 硬约束）
 

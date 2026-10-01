@@ -5,8 +5,45 @@
 ## Unreleased - 2026-10-01
 
 一轮设计系统审查，覆盖输入区、侧栏、右栏、外观控件与命令面。收尾时 `npm run check` 为 **86** 项，
-`npm run verify` 为 **360** 项断言；下面引用的每个数字、以及 README 夹具表里的每一行，
-都取自本机真实运行，不是手工维护的清单。
+`npm run verify` 为 **358** 项断言（外部独立审查后由 360 减到 358：删掉 3 条测死 CSS 的自证判据，
+新增 1 条测真实宿主锚点的判据 —— 数字减少是诚实减少）；下面引用的每个数字、
+以及 README 夹具表里的每一行，都取自本机真实运行，不是手工维护的清单。
+
+### ⓪ 独立审查回查：6 处死 CSS、1 处护栏空洞、4 条自证判据
+
+外部审查报告逐条回宿主 bundle 核对后报出问题，本节全部经本机复现与反向验证后处理。
+
+**6 处死 CSS**（皮肤里永不命中的规则）——
+
+- `content.css` 的 `[data-tone="warn"]`：宿主 `ToolDetails.badge` 的 tone 枚举是
+  `info/neutral/success/warning/error`，**没有 `warn`**，警告徽标一直吃不到警告色。已改为 `warning`。
+  注意令牌名仍是 `--dsw-alias-state-warn-*`（宿主 7 处，`-warning-` 0 处），属性值与令牌名**不可一起改**。
+- `[data-turn-process-chevron]`（2 处）、`[data-turn-process-body]`（2 处）：宿主
+  `dsh-client-ui-chat` 实际产出的只有 `-answer / -hidden / -inline / -member / -messages / -subagents / -tool-calls`。已删。
+- `[data-turn-process][data-expanded="false"]`：宿主是 `expanded || void 0` 的**属性缺席**语义
+  （其自身 CSS 用 `:not([data-expanded])`），`="false"` 永不出现。已删。
+- `patches.css` 的 `[data-slot="web-ui.plugin.item"]`：全宿主 1043 个 js/css 文件 0 命中。已删。
+- `model-picker.css` 的 `[data-disabled="true"]`：`src/` 与宿主均无写入点。已删。
+
+**护栏空洞**：`check.mjs` 9b 计算出 `proposals` 变量却只用在返回字符串里，从未进入 `assert` ——
+注释宣称的「必须在 docs/ 里有对应提案」在代码里是空的。已补真实断言：提案数 > 0、
+排除项与提案文件一一对应、孤儿提案反向报出；「有断言」改为检测非注释行里的真实调用点。
+`verify.mjs` 汇总末尾现在会打印「本次未计入汇总的排除项」，让排除这件事本身留痕。
+两次反向验证：删除提案文档、把 4 个 `t.check(` 改名，均如期报红。
+
+**4 条自证判据**（判据自身有 bug，比不严更危险）——
+
+- `content.mjs` 的夹具手写了宿主从不产出的 `data-turn-process-chevron` / `-body`，
+  等于对着自己造的假 DOM 测皮肤里那几条死 CSS。改用真实的 `-hidden` / `-member` / `-messages`，
+  `pre` 取样点挪到 `[data-tool]`（回合摘要区不装 `<pre>`，bundle 内该区域 `pre` 出现 0 次）。
+  撤下 3 条随死 CSS 失效的判据，新增 1 条「收起态由宿主的 `-hidden` 承担」。
+- `sidebar-keyboard.mjs` 的 c1 原按 `tabIndex >= 0` 判，而提案认可的两种修法（容器
+  `tabindex=0`+`aria-activedescendant`、roving tabindex）落地后行自身 `tabIndex` 恒为 -1 ——
+  判据比缺陷还苛刻。改以「`focus()` 后焦点是否真的落到该行」为准。
+- c2 原在程序化 `focus()` 之后立即量，此时页面无键盘交互、`:focus-visible` 按规范不匹配；
+  改到真实 Tab 序列走完之后量。
+- c3 原是 `reachedRow || reachedActions` 的「或」，会在宿主只修行、不给 `.rowActions`
+  加 `:focus-within` 时假绿。拆成 c3a（到达行）与 c3b（到达行内按钮）两条，缺一不可。
 
 ### ⑭ 后续消息队列并入输入卡
 

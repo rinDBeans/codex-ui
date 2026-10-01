@@ -366,10 +366,6 @@ body[data-ds-dark-theme] .codex-mp-effort {
   cursor: grabbing;
 }
 
-.codex-mp-root[data-disabled="true"] {
-  opacity: 0.6;
-}
-
 .codex-mp-popover[data-reduced-motion="true"] .codex-mp-root {
   --codex-mp-motion-duration: 0s;
   --codex-mp-tick-transform-duration: 0s;
