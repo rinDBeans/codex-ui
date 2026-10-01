@@ -48,8 +48,26 @@ npm run verify    # 期望 ALL PASS (317/317)，需要 DSH_CHROME
 | `1372e27` rebase PR#3 | A **已超越** | 其上游 `39ec999` 是 A 的祖先；`client.js` 两者差 1448 行 |
 
 **备份**（删除前导出，`docs/archive/`）：
-`pr3-411f168.patch` · `pr3-64f4d60.patch` · `pr3-1372e27.patch` · `pr3-branches.bundle`（4.6 MB，完整历史）
-恢复方式：`git am docs/archive/pr3-64f4d60.patch` 或 `git clone docs/archive/pr3-branches.bundle`
+`pr3-411f168.patch` · `pr3-64f4d60.patch` · `pr3-1372e27.patch`
+
+`pr3-branches.bundle`（4.4 MB，完整历史，32 个提交）**已从仓库移出**，改挂在本项目的 GitHub Release
+`v0.7.2` 的附件里 —— 二进制大文件放仓库会让体积只增不减，每次 clone 都要重复下载。
+
+恢复方式：
+
+```powershell
+# 三个 patch 仍在仓库里，直接 am
+git am docs/archive/pr3-64f4d60.patch
+
+# bundle 从 Release 附件下载（**必须带 -b**，见下方订正）
+gh release download v0.7.2 --repo rinDBeans/codex-ui -p pr3-branches.bundle -D docs/archive/
+git clone -b pr3-rebased docs/archive/pr3-branches.bundle ../recovered
+```
+
+> ⚠️ **0.7.2 订正**：原文写的 `git clone docs/archive/pr3-branches.bundle` **是错的**，从未被真跑过。
+> 该 bundle 只含 `refs/heads/pr3-rebased`、没有 HEAD，不带 `-b` 会 clone 出一个空仓库
+> （报 `remote HEAD refers to nonexistent ref`）。本机已实测：`git clone -b pr3-rebased …`
+> 可正常取出 32 个提交、78 个文件。
 
 ### 一件尚未处理的事
 

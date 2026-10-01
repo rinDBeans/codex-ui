@@ -2,7 +2,7 @@
 
 [简体中文](CHANGELOG.zh-CN.md)
 
-## Unreleased - 2026-10-01
+## 0.7.2 - 2026-10-01
 
 A design-system audit pass across the composer, sidebar, right panel, appearance controls and the command
 surface. At the end of it `npm run check` reports **86** checks and `npm run verify` **358** assertions

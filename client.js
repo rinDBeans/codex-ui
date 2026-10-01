@@ -1,4 +1,4 @@
-/* codex-ui 0.7.1 —— 由 scripts/build.mjs 从 src/client/ 与 skins/codex-ink/ 生成，勿手改。 */
+/* codex-ui 0.7.2 —— 由 scripts/build.mjs 从 src/client/ 与 skins/codex-ink/ 生成，勿手改。 */
 window.__ModuleLoader__.load({
   id: "codex-ui",
   factory: (require) => {

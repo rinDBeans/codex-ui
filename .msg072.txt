@@ -1,0 +1,18 @@
+0.7.2：bundle 移出仓库改挂 Release 附件，修正交接文档里从未跑通的恢复命令
+
+版本：0.7.1 -> 0.7.2（CHANGELOG 的 Unreleased 段落转为正式版本号）。
+
+bundle 移出仓库
+- docs/archive/pr3-branches.bundle（4.4 MB）从版本控制移除，改挂到 v0.7.2 的
+  Release 附件。二进制大文件进仓库会让体积只增不减，每次 clone 都要重复下载。
+- 移出前做了恢复演练：git clone -b pr3-rebased 可取出 32 个提交、78 个文件。
+
+顺带修掉交接文档里一条从未被真跑过的坏命令
+- 原文写的 git clone docs/archive/pr3-branches.bundle 是错的：该 bundle 只含
+  refs/heads/pr3-rebased、没有 HEAD，不带 -b 会 clone 出空仓库
+  （remote HEAD refers to nonexistent ref）。这条恢复路径在文档里躺了很久。
+  已改为 gh release download + git clone -b pr3-rebased，并注明订正原因。
+
+三个 patch 仍留在仓库里（合计 0.54 MB），恢复日常改动用 git am 即可。
+
+check 86/86；client.js 内嵌版本号已随 build 重建。
