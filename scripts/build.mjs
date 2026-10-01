@@ -35,6 +35,7 @@ export const SKIN_PARTS = [
   'composer.css', // L3 输入区
   'composer-queue.css', // L3 后续消息队列（QueueDock）并入输入卡那一族
   'settings.css', // L3 插件设置卡
+  'appearance.css', // L3 外观与字号（宿主行 + 皮肤档位对齐，T13）
   'settings-modal.css', // L3 设置模态框 Codex 化层
   'trajectory-exit.css', // L3 轨迹视图的退出出口
 ];

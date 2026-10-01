@@ -1,0 +1,51 @@
+/* codex-ink · L3 外观与字号两行（T13）
+   ─────────────────────────────────────────────────────────────────────────
+   宿主**已经实现** T13 的实质功能，本层不重造、不另建入口、不加配置字段：
+     · dsh-client-ui-theme 有 FontSizeRow（真实 store：createFontSizeRowStore() →
+       { fontSize: 14, revision: -1 }，sync 带 'if (revision <= d.revision) return' 的陈旧回声保护）；
+     · 有 AppearanceRow（注册进 General 分区的 item 槽，三格偏好；选中跟随**持久化偏好**，
+       不跟随解析后的主题）；
+     · 字号经 --dsh-content-font-size → --dsh-content-font-delta 下发，皮肤既有的
+       --dsw-font-markdown-h1/h2/h3 已经消费该 delta，所以字号改动本来就跟随。
+   按方案 §0.3/§7.2：宿主已满足的不改；插件**不得**再加一个字号字段（那会与宿主那个带
+   revision 守卫的 store 形成两份真源）。
+
+   实测（read: dsh-client-ui-theme 的 bundle 与两张 module.css）：这两行**没有**专属 data-*
+   锚点 —— 该包只产出 data-ds-dark-theme / data-dsh-automatic-focus / data-input-modality /
+   data-menu-material / data-platform / data-plugin-css，都不是给这两行的。
+   所以只能按类名后缀取；后缀写法对 CSS-Modules 哈希前缀免疫。
+   作用域收在 [data-slot="settings.section"]（宿主 settings-general 真实产出的槽出口，
+   本仓库 settings-modal.js 已依赖同一个锚点），避免这些通用后缀在全站误命中。
+
+   本文件只补**两处**宿主静态令牌绕过皮肤色板的地方，其余一律不动，理由逐条列在下面。 */
+
+/* ── ① 选中的外观格：宿主用的是一个**静态**令牌 --dsw-static-neutral-bluish-400 (#adb2b8)，
+   而皮肤全文件**没有声明任何 --dsw-static-***（实测：0 个）。也就是说这一处颜色
+   是这两行里唯一绕不过皮肤色板的 —— 它带蓝调（R173 G178 B184），与 ink 的中性灰板不同族。
+   换成皮肤的 --dsw-alias-label-primary：这是皮肤自己在别处表示「选中/激活」用的最强中性色
+   （见 settings-modal.css 的 [aria-current=true] 与 composer.css 的选中项取色思路）。
+   背景不动 —— 宿主那格用的是 --dsw-alias-bg-module-platform，皮肤已覆写为 #f9f9f9，本来就对。 */
+[data-slot="settings.section"] [class*="_themeCube"][class*="_selected"] {
+  border-color: var(--dsw-alias-label-primary);
+}
+
+/* ── ② 字号步进器的圆角：宿主写的是 --dsw-radius-md（**宿主**档位，12px），
+   而皮肤自有的档位是 --dsw-radius-xs/s/m/l/xl/2xl/menu/card/pill；
+   皮肤自己的设置卡控件（settings.css 的 .cx-hex / .cx-text / .cx-swatch）一律用 --dsw-radius-s。
+   同一屏里，插件自己的控件走 8px、宿主这一行走 12px，是这处唯一的不一致。
+   这里只把**这一个组件**对齐到皮肤档位，不去桥接两套档位本身 ——
+   桥接属于共享令牌变更，按方案 §0.1/§7.2 须经集成 owner 审核，不在本文件范围内（已上报）。 */
+[data-slot="settings.section"] [class*="_stepper"] {
+  border-radius: var(--dsw-radius-s);
+}
+
+/* ── 刻意**不改**的部分（写在这里，免得后来者当成漏做）──────────────────────
+   · 行的分隔线：宿主 .row/.group 用 --dsw-alias-border-l2，皮肤自己的 .cx-row 用 border-l1。
+     看似该统一，但这两行是与**其它宿主的 General 行**并排排在同一分区里的；
+     只把这两行改浅，会让它比紧邻的宿主行更淡 —— 那等于制造新的不一致。不改。
+   · 标题/说明字号：宿主 14px/12px，皮肤自有卡片 13px/11px。同理，同上。
+   · 步进器箭头的露出：宿主已写 `.stepper:hover .arrows, .stepper:focus-within .arrows` ——
+     **键盘可达性已经是好的**（与 T09 侧栏行那个 display:none 无 focus 的情形不同）。不改，
+     并在 spec 里加一条守卫断言，防止日后被皮肤误伤。
+   · 入口可见性：方案 §6.5 允许「加一个指向既有配置卡的快捷入口」，但那需要改 src/client/，
+     超出本任务的两文件写权限。**不在本文件用 CSS 伪造入口**（方案 §7.2 禁止假按钮）。已上报。 */

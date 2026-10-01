@@ -2165,6 +2165,14 @@ html[data-codex-ui] .cx-error {
   line-height: 16px;
 }
 
+html[data-codex-ui] [data-slot="settings.section"] [class*="_themeCube"][class*="_selected"] {
+  border-color: var(--dsw-alias-label-primary);
+}
+
+html[data-codex-ui] [data-slot="settings.section"] [class*="_stepper"] {
+  border-radius: var(--dsw-radius-s);
+}
+
 html[data-codex-ui] {
 
   --cx-sm-sidebar-w: 236px;
