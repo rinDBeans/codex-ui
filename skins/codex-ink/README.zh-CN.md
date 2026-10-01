@@ -13,6 +13,12 @@ Skin v2 清单格式，可由皮肤加载器单独收录。
 | `patches.css` | L3 组件 | 焦点环、链接、卡片契约、mono pill 徽标、tag tone 归一、reduced-motion、⑫ 宿主模型菜单（A 面）、⑬ 输入区顶栏与卡片、⑯ 右栏展开选择组件、⑰ composer 控件悬停 |
 | `model-picker.css` | L3 模型选择器组件 | B 面：`src/client/model-picker/` 自建的触发器、弹层与推理等级功率轨（Codex `_Track` / `_Tick` / `_Thumb` 逐字几何）；只画 `.codex-mp-*` 与席位的一条隐藏规则，不碰宿主菜单。验收 `scripts/verify.mjs model-picker` |
 | `sidebar-align.css` | L3 侧栏对齐 | 新会话行与插件行落到工作区列表行的两条竖线（图标列 20px、文字列 42px）；选择器同时覆盖 rc.1 扁平 DOM 与 rc.2 嵌套 DOM |
+| `overlays.css` | L3 浮层 | 浮层材质：把宿主的 `blur(40px) saturate(150%)` 压成不透明层；长列表溢出局部化到 `[data-trigger-menu]`。验收 `scripts/verify.mjs text` |
+| `content.css` | L3 会话内容 | 工具行、回合摘要/详情、状态三档；状态词表与宿主 `ToolRowState` 联合对账。验收 `scripts/verify.mjs content` |
+| `sidebar-rows.css` | L3 侧栏行 | 用宿主语义属性（`[data-row-key^="session:"]`、`[aria-selected="true"]`）把既有行状态映射成视觉；并把选中底色与悬停底色分开（宿主默认两者同一令牌）。验收 `scripts/verify.mjs sidebar-rows` |
+| `composer-queue.css` | L3 后续消息队列 | 把宿主的 `data-queue-dock` 面板并入输入卡那一族：顶部圆角跟 `--dsw-radius-card`，按 `overlays.css` 先例去掉 40px 背景糊影。验收 `scripts/verify.mjs queue-dock` |
+| `panels.css` | L3 右栏面板 | 滚动区按皮肤滚动条约定走 `::-webkit-scrollbar`，令牌与 `overlays.css` 同源；无后代通配符。验收 `scripts/verify.mjs panels` |
+| `appearance.css` | L3 外观与字号 | 皮肤色板没覆盖到的两处宿主行：选中的外观格与字号步进器圆角。复用宿主自己的 `FontSizeRow` store 与 `AppearanceRow`，不新增配置字段。验收 `scripts/verify.mjs appearance` |
 | `sidebar-surface.css` | L3 侧栏面 | 侧栏滚动渐隐：把宿主那条 24px 覆盖层让位，改用 Codex 的 40px 四段 mask 斜坡（挂在滚动容器上，右侧 12px 让开滚动条槽）。验收 `scripts/verify.mjs sidebar` |
 | `window-shadow.css` | L3 窗口边缘 | 会话窗口 0.5px 发丝线加 24px 环境影；右栏面板左沿只留 0.5px 发丝线、影只往上泄；右分界线拖拽柄悬停渐变 |
 | `composer.css` | L3 输入区 | 卡片几何与表面、编辑区 44px、底部控件行 28px、候选菜单、hero 布局。本层允许使用 `[class*=…]` 后缀锚点 |

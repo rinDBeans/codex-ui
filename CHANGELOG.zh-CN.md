@@ -2,6 +2,78 @@
 
 [English](CHANGELOG.md)
 
+## Unreleased - 2026-10-01
+
+一轮设计系统审查，覆盖输入区、侧栏、右栏、外观控件与命令面。收尾时 `npm run check` 为 **86** 项，
+`npm run verify` 为 **360** 项断言；下面引用的每个数字、以及 README 夹具表里的每一行，
+都取自本机真实运行，不是手工维护的清单。
+
+### ⑭ 后续消息队列并入输入卡
+
+队列贴在输入卡的**上沿**，却一直在吃宿主的菜单材质：它消费的正是菜单那枚 `--dsw-menu-backdrop-filter`，
+但它不在 ⑱ 所中和的 `[data-menu-material]` 锚点之下 —— 于是所有菜单都已去掉的 40px 背景模糊，
+在它这里活了下来；顶部圆角也和它紧贴的那张卡片不一致。
+
+- 实测（对队列面板取 `getComputedStyle`），改前 → 改后：`backdrop-filter` `blur(40px) saturate(1.5)` → `none`；
+  顶部圆角 `16px` → `--dsw-radius-card`（即卡片自身圆角，两条曲线同心）；下沿保持 `0`。
+- 底色改走 `--dsw-alias-bg-layer-1`：队列属输入区，不属浮层菜单那一族。
+- 外观在 `skins/codex-ink/composer-queue.css`；断言在 `scripts/specs/queue-dock.mjs`。
+- 不动宿主任何语义 —— `pendingRow` / `preview` / `editor` / `attachments` / `actions` 保持出厂行为。
+  该断言经反向验证：把模糊改回去，它立刻转红。
+
+### ② 侧栏行状态取自宿主自身的语义
+
+宿主给**当前**会话和**被悬停**的会话同一个底色令牌，于是「我正在的会话」与「鼠标划过的会话」长得一模一样 ——
+而皮肤此前**没有任何一条行样式**。
+
+- 实测：当前行 `rgba(13, 13, 13, 0.08)`，悬停行 `rgba(13, 13, 13, 0.04)`；宿主两者都是 `0.04`。
+- 锚点用宿主的稳定语义 —— `data-row-key`（`session:` / `workspace:` / `empty` / `overflow:`）与 `aria-selected` ——
+  不用每次构建都会变的 CSS-Modules 哈希类名。
+- 外观在 `skins/codex-ink/sidebar-rows.css`；断言在 `scripts/specs/sidebar-rows.mjs`。
+- `sidebar-align.css` 里最后一处祖先位置 `:has()` 已清除，与 `model-picker.css` 早先的约束一致（见下方性能说明）。
+
+### ②d 右栏滚动区跟上皮肤滚动条约定
+
+右栏滚动区此前吃浏览器默认，而菜单早已并到皮肤约定上。现在它同样走 `::-webkit-scrollbar`，
+用与菜单相同的令牌（8px、thumb 取 `--dsw-alias-scrollbar-bg-l2`），并加 `overscroll-behavior: contain`，
+让滚动面板不会把滚动链带到中列。
+
+- 外观在 `skins/codex-ink/panels.css`；断言在 `scripts/specs/panels.mjs`。
+- T11 其余部分无需改动：面板容器、页头、空态、不可用态本就解析到皮肤的 `--dsw-*` 令牌。
+- 该文件**不含后代通配符**，只点名具名容器，并有断言把它钉住 —— 右栏底下是文件树、终端与预览，
+  这些节点在流式输出时反复重建。
+
+### 外观：选中色块与字号步进器改用皮肤令牌
+
+这两个控件宿主本已实现，也都交给宿主。宿主的 `FontSizeRow` store 持有一个 `fontSize` 与一个单调 `revision`
+用来保护写入（`sync(d, fontSize, revision) { if (revision <= d.revision) return; … }`），`AppearanceRow` 则把
+三档 `preference` 放在同一个守卫下。**没有重实现任何逻辑，也没有新增配置字段** —— 皮肤只是不再让这两个控件
+显示宿主写死的值。
+
+- 选中的外观色块读皮肤的 `--dsw-alias-label-primary`。实测：皮肤 `rgb(26, 28, 31)`，宿主停在 `rgb(173, 178, 184)`。
+- 字号步进器的圆角读皮肤的 `--dsw-radius-s`。实测：皮肤 `8px`，宿主停在 `12px`。
+- 外观在 `skins/codex-ink/appearance.css`（2 个令牌，均已在 `skin.css` 声明）；断言在 `scripts/specs/appearance.mjs`
+  （13 条），含「字号改动穿透到皮肤正文令牌」（21px → 25px）与还原路径。
+
+### 只记录、未修的部分
+
+- **侧栏行菜单键盘够不到。** 会话行渲染为 `div[role="treeitem"]` 且不带 `tabindex`（整个
+  `dsh-client-ui-workspace` bundle 只有一处 `tabindex`，属于搜索框），行操作按钮所在的元素默认 `display:none`，
+  只在 `:hover`/`menuOpen` 时露出，且没有 `:focus-within` 规则。`display:none` 的元素不在 Tab 序列里，
+  纯 CSS 造不出键盘通路。已按宿主提案记在 `docs/host-proposal-sidebar-keyboard.zh-CN.md`；三条断言在
+  `scripts/specs/sidebar-keyboard.mjs`，由 `scripts/verify.mjs` 的 `OPT_IN` 集合排除在默认全量之外，
+  主门禁保持全绿，缺口仍在册。
+- **命令面板交给宿主。** `dsh-client-ui-commands` 只产出一个 `data-*`（`data-plugin-css`）；它的槽出口与别的
+  组件共用，面板根 `data-menu-material` 又是全族共享，唯一可区分的手段是拿 `:not([data-trigger-menu])` 去排除
+  兄弟 —— 已否决。Ctrl+K 宿主已绑给 `session.search`，且面板不渲染任何键位提示。记在
+  `docs/codex-ui-t12-verdict.zh-CN.md`。
+- **两套圆角档并存且未桥接。** 皮肤声明 `--dsw-radius-s` / `-m` / `-l`；宿主组件消费 `--dsw-radius-sm` /
+  `-md` / `-lg`。两者当前都能解析（宿主 `ui-theme` 层供着第二套），所以没有坏 —— 但宿主调档会让皮肤自有圆角
+  与宿主自有圆角脱节。刻意不桥接：那属于共享令牌变更。记在 `docs/codex-ui-t10-verdict.zh-CN.md`。
+- **本节内容全部为夹具实测，未在真机 `dsh web` 上验证** —— 没有起过实例。`panels.css` 的滚动条改动在此环境
+  更是无法测量：`scripts/lib/cdp.mjs` 启动 Chromium 时带 `--hide-scrollbars`，`offsetWidth - clientWidth`
+  恒为 0，「标准滚动条属性与 `::-webkit-scrollbar` 哪条生效」**没有**实测支撑 —— 取舍依据是与 `overlays.css`
+  的既有实现保持一致。
 ## 0.7.1 - 2026-09-29
 
 ### ⑬d 「轨迹」视图的退出出口

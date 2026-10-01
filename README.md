@@ -40,12 +40,12 @@ Fixtures read the shipped host CSS and render code directly, so a structural hos
 | ⑬ | Composer header turned blank, panel buttons keep the official icons |
 | ⑬c | Both header slots **released**: entries registered there render again (subagent descendant count / job roster / preset badge / open-in-app); the view tabs stay hidden. The entries are conditionally rendered, so the top bar is unchanged in the common case |
 | ⑬d | **An exit for the Trajectory view**: once ⑬ hides the tab strip, Trajectory has an entrance but no way out — a tool card's expanded Inspect goes through `openView('trajectory', callId)`, and the only route back was that strip. While the Trajectory view is showing, a "← Chat" pill floats at the lower-left of the view area; clicking it **clicks that very tab**, the same `selectView` callback a real click uses, with no host internals involved. Structure in `src/client/trajectory-exit.js`, looks in `skins/codex-ink/trajectory-exit.css`. Which tab is Chat is calibrated from `aria-selected` while Chat renders, falling back to the tab's own text; with neither, **no button is shown at all**. If the strip ever becomes visible again this layer steps aside. Any mismatch with the host layout warns and skips |
-| ⑭ | Composer card: radius (card 20/25, top strip = the card's own radius), shadow, geometry, tool row, hero layout |
+| ⑭ | Composer card: radius (card 20/25, top strip = the card's own radius), shadow, geometry, tool row, hero layout; the follow-up queue that stacks against the card's top edge is pulled into the same family (top corners = `--dsw-radius-card`, and no 40px backdrop blur) |
 | ⑯ | Right panel guide entries: no border, no fill, 52px rows, 20px icons, filled shortcut pills |
 | ⑰ | Composer bottom controls: add button has no box until hover; model and permission controls share the hover chip and, like the add button, are **fully rounded** (Codex reference measures R = h/2) |
-| ② | Sidebar colors match the Codex light sidebar; sidebar rows align with the workspace list |
+| ② | Sidebar colors match the Codex light sidebar; sidebar rows align with the workspace list, and row states are mapped from the host's own semantics — the current session (`aria-selected`) gets its own fill, kept distinct from hover (**measured 0.08 vs 0.04**, where the host gives both the same token) |
 | ②c | Conversation window edge: 0.5px hairline plus a 24px ambient shadow |
-| ②d | Right panel: hairline only on its left edge, shadow bleeds upward only; the dockkit 1px border is removed |
+| ②d | Right panel: hairline only on its left edge, shadow bleeds upward only; the dockkit 1px border is removed; its scroll areas follow the skin's scrollbar rule (`::-webkit-scrollbar`, the same tokens the menus use) |
 | ②e | Right divider handle: center-darkest gradient on hover |
 | ⑱ | Settings card on the plugin manager's codex-ui bundle page: theme / accent / background / foreground / UI font / code font / translucent sidebar / Codex model picker / contrast |
 | ㉑ | **Settings modal, full-page Codex pass**: the settings dialog gets a grouped sidebar (a "← Back to app" row, a search box that filters host items, group headers), a page header in the content area, white cards with hairlines on every sub-page and sticky save bars. Structure comes from `src/client/settings-modal.js` (host anchors only, host nodes never moved or cloned, hiding driven by a durable `data-*` attribute), looks from `skins/codex-ink/settings-modal.css`. Any step that does not match the host layout warns and skips — the layer degrades, it never throws |
@@ -137,7 +137,7 @@ ones go through a `ctx.inject([...], cb)` child scope, as the model picker does.
 | `src/client/model-picker/` | Model picker face B: `index.js` waits for the `modelDirectories` service, `component.js` is the seat takeover, popover and power rail, `view.js` holds the pure functions (unit-tested by `check.mjs`) |
 | `src/client/trajectory-exit.js` | ⑬d Trajectory exit: floats a "← Chat" pill that **clicks the Chat tab itself** (the same `selectView` callback a real click uses, no host internals). Calibrates which tab is Chat from `aria-selected`, falls back to its text, and shows no button at all when neither resolves |
 | `src/client/constants.js` `host.js` | Shared names and small helpers for reading host services |
-| `skins/codex-ink/` | Stylesheet sources (skin.css / patches.css / model-picker.css / sidebar-align.css / sidebar-surface.css / window-shadow.css / composer.css / settings.css / settings-modal.css / trajectory-exit.css) and the Skin v2 manifest |
+| `skins/codex-ink/` | Stylesheet sources (skin.css / patches.css / overlays.css / content.css / model-picker.css / sidebar-align.css / sidebar-rows.css / sidebar-surface.css / panels.css / window-shadow.css / composer.css / composer-queue.css / settings.css / settings-modal.css / trajectory-exit.css) and the Skin v2 manifest. The list is the `SKIN_PARTS` order in `scripts/build.mjs`, which is the cascade order |
 | `theme.css` `client.js` | Generated by `scripts/build.mjs` and committed (DSH loads `client.js`) |
 | `scripts/build.mjs` | Scoping and bundling |
 | `scripts/check.mjs` | Host-free repository checks; the CI entry point |
@@ -154,8 +154,8 @@ ones go through a `ctx.inject([...], cb)` child scope, as the model picker does.
 
 | Command | Coverage | Requirement |
 |---|---|---|
-| `npm run check` | Syntax, JSON, manifest and `peerDependencies`, artifacts in sync with sources, the DSH client plugin contract of `client.js` (executed once in isolation), scoping, override-layer and power-rail pure functions, 36 WCAG pairs, color whitelist, encoding, docs pairing, machine-specific paths, the settings-modal contract (sources / scoping / host-first anchor / assembly) — 67 checks | none |
-| `npm run verify` | All fixtures, 224 assertions (table below) | host packages + Chromium |
+| `npm run check` | Syntax, JSON, manifest and `peerDependencies`, artifacts in sync with sources, the DSH client plugin contract of `client.js` (executed once in isolation), scoping, override-layer and power-rail pure functions, 36 WCAG pairs, color whitelist, encoding, docs pairing, machine-specific paths, the settings-modal contract (sources / scoping / host-first anchor / assembly) — 86 checks | none |
+| `npm run verify` | All fixtures, 360 assertions (table below) | host packages + Chromium |
 | `node scripts/live/gui.mjs --url <token URL>` | Real GUI: shadows and both dividers, plus the model seat — 14 assertions with face B on (takeover, geometry, a keyboard change written into the host store and reverted), 10 with it off (the face A pending window; `--latency` adds 800ms to that round trip by default, since locally it takes <60ms and cannot be sampled) | a running `dsh web` |
 | `node scripts/live/settings.mjs --url <…>` | Real GUI: the card on the bundle page, its 9 rows, no override at defaults, switch and accent writes, the host seat coming back when the model picker is off, survival across a reload, no intermediate frame while switching theme; resets everything at the end — 30 assertions | same, with the plugin manager enabled |
 | `node scripts/live/settings-modal.mjs --url <…>` | Real GUI: the ㉑ structure layer and its visual layer together — the grouped sidebar, the "← Back to app" row, the search filter, group headers, host node identity (nothing moved or cloned), and the attribute-first hiding that survives the host rewriting `className`. Needs a live `dsh web` with the plugin manager enabled; `--explore` dumps the structure without asserting | same |
@@ -166,12 +166,23 @@ Fixtures: `node scripts/verify.mjs [spec…]`; without a spec, all of them run.
 
 | Spec | Sections | Coverage | Assertions |
 |---|---|---|---|
-| `composer` | composer-shadow · hero | ⑱ composer shadow **fitted to measured pixels** (two layers — ring + near field; per-layer geometry and alpha, dark inset, narrow and wide viewports agreeing, rendered pixels); ⑬ ⑭ ⑰, the focus ring, the released header slots and the badge colour / radius read from the tokens themselves | 21 + 25 |
+| `appearance` | appearance | The appearance cube's **selected** swatch reads the skin's `--dsw-alias-label-primary` (the host leaves it at `rgb(173, 178, 184)`); the font-size stepper's radius reads `--dsw-radius-s` (the host leaves `12px`); a size change reaches the skin's prose token (21px → 25px) and the reset path returns it; the stepper's arrows still appear on keyboard focus | 13 |
+| `composer` | composer-shadow · hero | ⑱ composer shadow **fitted to measured pixels** (two layers — ring + near field; per-layer geometry and alpha, dark inset, narrow and wide viewports agreeing, rendered pixels); ⑬ ⑭ ⑰, the focus ring, the released header slots and the badge colour / radius read from the tokens themselves | 21 + 26 |
+| `content` | state_tiers · variants · expandable · turn_process · reduced_motion · waiting · reference | ⑲ tool cards: the three state tiers, the seven `data-variant` groups, expandable detail, the turn summary/detail hierarchy, the waiting states (approval / question / goal / command input), reduced motion, and the reference menu's group headers | 12 + 12 + 6 + 8 + 2 + 11 + 12 |
 | `elevation` | elevation | ⑲ `--dsw-elevation-*` against Codex's source, plus a rendered menu panel | 19 |
 | `model-picker` | host-menu · power-rail | ⑫ face A (the host menu) and the pending indicator; ⑳ face B: seat takeover and hand-back, geometry, no commit while dragging / one snapped commit on release, no snap-back and a spinner during a slow round trip, **the top-rung violet dot matrix** (5 rows, 8 tone buckets, hash-scattered phases, feathering, both reduced-motion switches), the four keys, focus ring, Escape, model change carrying its default effort, failure notice, reduced motion, dark, the switch. The fake directory is shaped like the **installed** host (no `pending` in the snapshot) | 20 + 62 |
+| `panels` | panels | ②d the right panel's scroll areas move onto the skin's `::-webkit-scrollbar` rule (8px, thumb on the skin's scrollbar tokens); its empty and unavailable states already resolve through skin tokens; the file carries **no descendant wildcards** | 12 |
+| `queue-dock` | dock | ⑭ the follow-up queue that docks against the composer card's top edge: top corners concentric with the card, the 40px backdrop blur gone, fill moved to `--dsw-alias-bg-layer-1` | 4 |
 | `rightbar` | rightbar | Shadow layer, right panel, both dividers | 42 |
 | `sidebar` | align · surface | Sidebar column alignment; the sidebar scroll fade (Codex mask ramp), mechanism plus per-pixel alpha | 6 + 13 |
 | `sidebar-color` | sidebar-color | The sidebar base against Codex's **measured** pixels, both themes on one page: light 246/233/255 and dark 15/31/17 (all neutral, R=G=B), the sidebar-to-content step in each, the hierarchy direction, plus a per-theme negative control | 16 |
+| `sidebar-rows` | rows · search | ② sidebar rows: the current session (`aria-selected`) stays visually distinct from hover (**0.08 vs 0.04**, where the host gives both the same token), long titles do not overflow, pinned and archived rows remain distinguishable, hover reveals the row actions, and the search expanded / no-result states are covered | 9 + 5 |
+| `text` | link_prose · chip_meta · overlay | ⑱ prose links against navigation links (only prose keeps the accent; navigation inherits), UI labels are not forced monospace while code / chips / refs stay so, and the overlay material plus long-list overflow | 9 + 7 + 13 |
+
+The table is produced by a real `npm run verify` run against the host named below; the numbers are not maintained
+by hand. `sidebar-keyboard` is the one spec that does not appear here: it records a host gap and is excluded from
+the default run through the `OPT_IN` set in `scripts/verify.mjs`, so `npm run verify` stays green while the gap stays
+on record.
 
 Options: `--host <app.asar | node_modules>` picks the host, `--shots <dir>` the screenshot directory (default
 `codex-ui-shots/` under the system temp directory), `--verbose` prints the readings. Fixtures read the shipped host CSS
@@ -361,6 +372,27 @@ thing from the sidebar. The composer card over it measures 35, matching Codex.
 - Selectors keep `:has()` out of ancestor positions: while the conversation streams nodes in, Chromium re-matches the
   whole subtree under every affected ancestor, which took style recalc from ~0.3s to over 4s. The remaining `:has()`
   are in subject position or look at direct children only; `check.mjs` holds `model-picker.css` at zero.
+- **The sidebar's row menu cannot be reached with a keyboard.** Session rows render as `div[role="treeitem"]` with no
+  `tabindex` (the whole `dsh-client-ui-workspace` bundle contains exactly one `tabindex`, on the search input), and the
+  row action button sits in a `rowActions` element that is `display:none` until `:hover` or `menuOpen` — there is no
+  `:focus-within` rule. A `display:none` element is outside the tab order, so no keyboard path to that menu exists and
+  no pure-CSS rule can create one. Filed as a host proposal in `docs/host-proposal-sidebar-keyboard.zh-CN.md`; the three
+  assertions that record it live in `scripts/specs/sidebar-keyboard.mjs`, which is **excluded from the default run** via
+  the `OPT_IN` set in `scripts/verify.mjs`, so the main gate stays green while the gap stays on record.
+- **Two radius scales are in use and are not bridged.** The skin declares `--dsw-radius-s` / `-m` / `-l`; host components
+  consume `--dsw-radius-sm` / `-md` / `-lg`. Both resolve today (the host `ui-theme` layer supplies the second set), so
+  nothing is broken — but a change to the host scale would desync skin-owned and host-owned corners. Left unbridged on
+  purpose: it is a shared-token change. Recorded in `docs/codex-ui-t10-verdict.zh-CN.md`.
+- **The command palette is left to the host.** `dsh-client-ui-commands` emits exactly one `data-*` attribute
+  (`data-plugin-css`); its slot outlet is shared with other components and its panel root (`data-menu-material`) is
+  family-wide, so the only discriminator would be a `:not([data-trigger-menu])` test against a sibling — rejected.
+  Ctrl+K is already bound by the host to `session.search`, and the palette renders no shortcut hints at all. Recorded in
+  `docs/codex-ui-t12-verdict.zh-CN.md`.
+- **Everything added in this round is fixture-verified, not verified on a live `dsh web`.** No live instance was started.
+  The scrollbar work in `panels.css` in particular cannot be measured here at all: `scripts/lib/cdp.mjs` launches Chromium
+  with `--hide-scrollbars`, so `offsetWidth - clientWidth` is always 0 and the choice between the standard scrollbar
+  properties and the `::-webkit-scrollbar` path is **not** settled by measurement — it follows the skin's existing
+  implementation in `overlays.css` instead.
 
 ## Codex source alignment
 

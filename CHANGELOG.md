@@ -2,6 +2,91 @@
 
 [简体中文](CHANGELOG.zh-CN.md)
 
+## Unreleased - 2026-10-01
+
+A design-system audit pass across the composer, sidebar, right panel, appearance controls and the command
+surface. At the end of it `npm run check` reports **86** checks and `npm run verify` **360** assertions;
+every figure quoted below, and every row of the README's fixture table, comes from a real run on this
+machine rather than from a hand-maintained list.
+
+### ⑭ The follow-up queue is pulled into the composer card's family
+
+The queue docks against the composer card's **top edge**, and it was inheriting the host's menu material:
+it consumes the same `--dsw-menu-backdrop-filter` token the menus do, but it does not sit under the
+`[data-menu-material]` anchor that ⑱ neutralises — so a 40px backdrop blur survived there after every menu
+had already lost it, and its top corners were a different radius from the card it is welded to.
+
+- Measured on the dock panel (`getComputedStyle`), before → after: `backdrop-filter` `blur(40px) saturate(1.5)`
+  → `none`; top corners `16px` → `--dsw-radius-card` (the card's own radius, so the two curves are concentric);
+  bottom corners stay `0`.
+- The fill moves to `--dsw-alias-bg-layer-1`: the queue belongs to the input area, not to the overlay-menu family.
+- Looks in `skins/codex-ink/composer-queue.css`; assertions in `scripts/specs/queue-dock.mjs`.
+- No host semantics are touched — `pendingRow` / `preview` / `editor` / `attachments` / `actions` are as shipped.
+  The assertion was verified by turning the blur back on, which turns it red.
+
+### ② Sidebar row states come from the host's own semantics
+
+The host gives the **current** session and a **hovered** session the same background token, so "the session I
+am in" and "the session the pointer happens to be over" looked identical — and the skin styled no row at all.
+
+- Measured: current row `rgba(13, 13, 13, 0.08)` against hover `rgba(13, 13, 13, 0.04)`; the host leaves both at `0.04`.
+- Anchors are the host's stable semantics — `data-row-key` (`session:` / `workspace:` / `empty` / `overflow:`)
+  and `aria-selected` — never hashed CSS-module class names, which change every build.
+- Looks in `skins/codex-ink/sidebar-rows.css`; assertions in `scripts/specs/sidebar-rows.mjs`.
+- The last ancestor-position `:has()` went out of `sidebar-align.css`, matching the rule already enforced for
+  `model-picker.css` (see the performance note below).
+
+### ②d Right-panel scroll areas follow the skin's scrollbar rule
+
+The right panel's scroll areas were still on the browser default while the menus had long since been brought
+onto the skin's rule. They now use `::-webkit-scrollbar` with the same tokens as the menus (8px, thumb
+`--dsw-alias-scrollbar-bg-l2`), plus `overscroll-behavior: contain` so scrolling the panel does not chain into
+the middle column.
+
+- Looks in `skins/codex-ink/panels.css`; assertions in `scripts/specs/panels.mjs`.
+- The rest of T11 needed no work: the panel container, page header, empty state and unavailable state already
+  resolve through the skin's `--dsw-*` tokens.
+- The file contains **no descendant wildcards** — only named containers — and an assertion holds it that way,
+  because the right panel hosts a file tree, a terminal and previews whose nodes are rebuilt while streaming.
+
+### Appearance: the selected swatch and the font stepper use the skin's tokens
+
+The host already implements these controls, and both were left to it. Its `FontSizeRow` store holds a
+`fontSize` plus a monotonic `revision` that guards writes (`sync(d, fontSize, revision) { if (revision <= d.revision) return; … }`),
+and `AppearanceRow` holds a three-way `preference` behind the same guard. **Nothing was reimplemented and no
+new config field was added** — the skin only stops the two controls from displaying host-static values.
+
+- The selected appearance swatch reads the skin's `--dsw-alias-label-primary`. Measured: skin `rgb(26, 28, 31)`
+  where the host left it at `rgb(173, 178, 184)`.
+- The font-size stepper's radius reads the skin's `--dsw-radius-s`. Measured: skin `8px` where the host left it at `12px`.
+- Looks in `skins/codex-ink/appearance.css` (2 tokens, both declared in `skin.css`); assertions in
+  `scripts/specs/appearance.mjs` (13), including that a size change reaches the skin's prose token (21px → 25px)
+  and that the reset path puts it back.
+
+### Recorded rather than fixed
+
+- **The sidebar's row menu cannot be reached with a keyboard.** Session rows render as `div[role="treeitem"]`
+  with no `tabindex` (the whole `dsh-client-ui-workspace` bundle contains exactly one `tabindex`, on the search
+  input), and the row action button sits in an element that is `display:none` until `:hover`/`menuOpen` with no
+  `:focus-within` rule. A `display:none` element is outside the tab order, so no pure-CSS rule can create a
+  keyboard path. Filed as a host proposal in `docs/host-proposal-sidebar-keyboard.zh-CN.md`; its three assertions
+  live in `scripts/specs/sidebar-keyboard.mjs`, excluded from the default run by the `OPT_IN` set in
+  `scripts/verify.mjs`, so the main gate stays green while the gap stays on record.
+- **The command palette is left to the host.** `dsh-client-ui-commands` emits exactly one `data-*` attribute
+  (`data-plugin-css`); its slot outlet is shared with other components and its panel root (`data-menu-material`)
+  is family-wide, so the only discriminator would be a `:not([data-trigger-menu])` test against a sibling —
+  rejected. Ctrl+K is already bound by the host to `session.search`, and the palette renders no shortcut hints.
+  Recorded in `docs/codex-ui-t12-verdict.zh-CN.md`.
+- **Two radius scales are in use and are not bridged.** The skin declares `--dsw-radius-s` / `-m` / `-l`; host
+  components consume `--dsw-radius-sm` / `-md` / `-lg`. Both resolve today (the host `ui-theme` layer supplies
+  the second set), so nothing is broken — but a change to the host scale would desync skin-owned from
+  host-owned corners. Left unbridged on purpose: it is a shared-token change. Recorded in
+  `docs/codex-ui-t10-verdict.zh-CN.md`.
+- **Everything in this section is fixture-verified, not verified on a live `dsh web`** — no live instance was
+  started. The scrollbar work in `panels.css` cannot be measured here at all: `scripts/lib/cdp.mjs` launches
+  Chromium with `--hide-scrollbars`, so `offsetWidth - clientWidth` is always 0 and the choice between the
+  standard scrollbar properties and the `::-webkit-scrollbar` path is **not** settled by measurement — it
+  follows the skin's existing implementation in `overlays.css` instead.
 ## 0.7.1 - 2026-09-29
 
 ### ⑬d An exit for the Trajectory view

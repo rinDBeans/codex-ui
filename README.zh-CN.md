@@ -36,12 +36,12 @@ DSH Web 的界面元素按 Codex 复刻：窗口边缘的阴影与发丝线、�
 | ⑬ | 输入区顶栏消隐、面板按钮保留官方图标 |
 | ⑬c | 顶栏两格**放开**：注册在两个槽里的条目恢复渲染（子代理后代计数 / jobs roster / 预设徽标 / 在应用中打开）；视图页签仍隐去。条目本身条件渲染，所以常态顶栏与放开前一致 |
 | ⑬d | **「轨迹」视图的退出出口**：⑬ 隐去页签条之后，「轨迹」只剩入口没有出口 —— 工具卡展开后的 Inspect 走 `openView('trajectory', callId)`，回来的路却只有那条页签条。轨迹视图显示时在视图区左下角浮一个「← 对话」，点击就是**点那一格页签本身**（与用户手点同一条 `selectView` 回调，不绕宿主内部 API）。结构在 `src/client/trajectory-exit.js`，外观在 `skins/codex-ink/trajectory-exit.css`。「对话是哪一格」先按 `aria-selected` 标定、再按页签文字兜底，两者都没有就**不出按钮**；页签条哪天重新可见本层自动让位。任何一步与宿主结构不符都只 warn 并跳过 |
-| ⑭ | 输入卡：圆角（卡片 20/25，上栏条 = 卡片同值）、阴影、几何、工具条、hero 布局 |
+| ⑭ | 输入卡：圆角（卡片 20/25，上栏条 = 卡片同值）、阴影、几何、工具条、hero 布局；贴在上沿叠放的后续消息队列并入同一族（顶部圆角 = `--dsw-radius-card`，且不吃 40px 背景模糊） |
 | ⑯ | 右栏展开选择组件：无描边无底色、行高 52px、图标 20px、快捷键灰底 pill |
 | ⑰ | composer 底部控件：加号默认无底色框、悬停才填；模型与权限控件同套悬停胶囊，且与加号一样是**全圆角**（Codex 参考图实测 R = h/2） |
-| ② | 侧栏配色对齐 Codex 亮色侧栏；侧栏列对齐工作区列表行 |
+| ② | 侧栏配色对齐 Codex 亮色侧栏；侧栏列对齐工作区列表行，行状态按宿主自己的语义映射 —— 当前会话（`aria-selected`）单独给一层填充，与悬停区分开（**实测 0.08 vs 0.04**，宿主原本两者同色） |
 | ②c | 会话窗口边缘：0.5px 发丝线加 24px 全向环境影 |
-| ②d | 右栏面板：左沿只留发丝线、影只往上泄；压掉 dockkit 的 1px 深边框 |
+| ②d | 右栏面板：左沿只留发丝线、影只往上泄；压掉 dockkit 的 1px 深边框；滚动区跟随皮肤滚动条约定（`::-webkit-scrollbar`，与菜单同一组令牌） |
 | ②e | 右分界线拖拽柄：悬停时中段最深、两端淡出的渐变 |
 | ⑱ | 插件管理 → codex-ui 组合包页的设置卡：主题 / 强调色 / 背景 / 前景 / UI 字体 / 代码字体 / 半透明侧边栏 / Codex 模型选择器 / 对比度 |
 | ㉑ | **设置模态框全页 Codex 化**：设置对话框换成分组侧栏（「← 返回应用」一行、按文字过滤宿主条目的搜索框、分组标题）、内容区页头、每个子页面的白卡细边与贴底保存栏。结构在 `src/client/settings-modal.js`（只用宿主锚点，宿主节点绝不移动或克隆；隐藏态靠耐久的 `data-*` 属性），外观在 `skins/codex-ink/settings-modal.css`。任何一步与宿主结构不符都只 warn 并跳过 —— 这一层会降级，绝不抛 |
@@ -128,7 +128,7 @@ node scripts/build.mjs --check   # 只比对产物是否过期，不落盘
 | `src/client/model-picker/` | 模型选择器 B 面：`index.js` 等 `modelDirectories` 服务，`component.js` 是席位顶替、弹层与功率轨，`view.js` 是纯函数（`check.mjs` 单测） |
 | `src/client/trajectory-exit.js` | ⑬d 轨迹退出出口：浮一个「← 对话」，点击就是**点那一格页签本身**（与用户手点同一条 `selectView` 回调，不碰宿主内部）。「对话是哪一格」先按 `aria-selected` 标定、再按页签文字兜底，两者都没有就**不出按钮** |
 | `src/client/constants.js` `host.js` | 共用的名字、读宿主服务的小工具 |
-| `skins/codex-ink/` | 样式正本（skin.css / patches.css / model-picker.css / sidebar-align.css / sidebar-surface.css / window-shadow.css / composer.css / settings.css / settings-modal.css / trajectory-exit.css）与 Skin v2 清单 |
+| `skins/codex-ink/` | 样式正本（skin.css / patches.css / overlays.css / content.css / model-picker.css / sidebar-align.css / sidebar-rows.css / sidebar-surface.css / panels.css / window-shadow.css / composer.css / composer-queue.css / settings.css / settings-modal.css / trajectory-exit.css）与 Skin v2 清单。顺序即 `scripts/build.mjs` 里 `SKIN_PARTS` 的顺序，也就是层叠顺序 |
 | `theme.css` `client.js` | 生成物，由 `scripts/build.mjs` 写出并提交（DSH 加载的是 `client.js`） |
 | `scripts/build.mjs` | 作用域化与打包 |
 | `scripts/check.mjs` | 不依赖宿主的仓库体检，CI 入口 |
@@ -145,8 +145,8 @@ node scripts/build.mjs --check   # 只比对产物是否过期，不落盘
 
 | 命令 | 覆盖 | 前置 |
 |---|---|---|
-| `npm run check` | 语法、JSON、清单与 `peerDependencies`、产物与源码同源、`client.js` 的 DSH 插件契约（隔离执行一遍）、作用域化、覆盖层与功率轨纯函数、36 组 WCAG、彩色白名单、编码、双语文档成对、机器专属路径、设置模态框契约（源文件 / 作用域化 / 宿主锚点优先 / 装配），67 项 | 无 |
-| `npm run verify` | 全部夹具，224 项（见下表） | 宿主包 + Chromium |
+| `npm run check` | 语法、JSON、清单与 `peerDependencies`、产物与源码同源、`client.js` 的 DSH 插件契约（隔离执行一遍）、作用域化、覆盖层与功率轨纯函数、36 组 WCAG、彩色白名单、编码、双语文档成对、机器专属路径、设置模态框契约（源文件 / 作用域化 / 宿主锚点优先 / 装配），86 项 | 无 |
+| `npm run verify` | 全部夹具，360 项（见下表） | 宿主包 + Chromium |
 | `node scripts/live/gui.mjs --url <带 token 的 URL>` | 真 GUI：阴影与两条分界线，加模型位 —— B 面开着时 14 项（顶替、几何、键盘改档写进宿主 store 并改回），关着时 10 项（A 面 pending 窗口；`--latency` 默认给往返加 800ms，本机往返 <60ms 采不到） | `dsh web` 实例 |
 | `node scripts/live/settings.mjs --url <…>` | 真 GUI：组合包页设置卡、9 行结构、默认不覆盖、开关与强调色写入、模型选择器关掉后宿主那一格复原、刷新后仍在、主题切换逐帧无中间帧；结束时全部重置，30 项 | 同上（profile 需启用插件管理） |
 | `node scripts/live/settings-modal.mjs --url <…>` | 真 GUI：㉑ 的结构层与视觉层一起验 —— 分组侧栏、「← 返回应用」行、搜索过滤、分组标题、宿主节点同一性（不搬移不克隆），以及宿主重写 `className` 后仍生效的属性优先隐藏。需要启用了插件管理的真 `dsh web`；`--explore` 只导结构不断言 | 同上 |
@@ -157,12 +157,22 @@ node scripts/build.mjs --check   # 只比对产物是否过期，不落盘
 
 | spec | 小节 | 覆盖 | 项数 |
 |---|---|---|---|
-| `composer` | composer-shadow · hero | ⑱ 输入卡阴影**按实测像素拟合**（两层：环 + 近场；逐层几何与 alpha、暗色 inset、宽窄屏一致、渲染像素）；⑬⑭⑰ 与焦点环、顶栏两格放开、徽标配色与圆角改读令牌计算值 | 21 + 25 |
+| `appearance` | appearance | 外观色块的**选中**态读皮肤 `--dsw-alias-label-primary`（宿主停在 `rgb(173, 178, 184)`）；字号步进器圆角读 `--dsw-radius-s`（宿主停在 `12px`）；字号改动穿透到皮肤正文令牌（21px → 25px）且还原路径可回；步进器箭头在键盘聚焦时仍露出 | 13 |
+| `composer` | composer-shadow · hero | ⑱ 输入卡阴影**按实测像素拟合**（两层：环 + 近场；逐层几何与 alpha、暗色 inset、宽窄屏一致、渲染像素）；⑬⑭⑰ 与焦点环、顶栏两格放开、徽标配色与圆角改读令牌计算值 | 21 + 26 |
+| `content` | state_tiers · variants · expandable · turn_process · reduced_motion · waiting · reference | ⑲ 工具卡：三档状态、七档 `data-variant` 分组、可展开详情、回合摘要/详情层级、等待态（审批 / 提问 / 目标 / 命令输入）、reduced-motion，以及引用菜单的组标题 | 12 + 12 + 6 + 8 + 2 + 11 + 12 |
 | `elevation` | elevation | ⑲ `--dsw-elevation-*` 与 Codex 源码对账，外加渲染出的菜单面板 | 19 |
 | `model-picker` | host-menu · power-rail | ⑫ A 面宿主菜单与 pending 指示器；⑳ B 面：席位顶替与复原、几何、拖动中不提交 / 松手对齐提交一次、慢往返不回弹且转圈、键盘四键、焦点环、Escape、换模型带默认档、失败提示、**顶档紫色点阵**（5 行、8 档色调桶、相位 hash 散开、羽化、两条关动效口子）、reduced-motion、深色、开关。假目录按**安装中的**宿主形状写（快照里没有 `pending`） | 20 + 62 |
+| `panels` | panels | ②d 右栏滚动区并入皮肤的 `::-webkit-scrollbar` 规则（8px、thumb 取皮肤滚动条令牌）；空态与不可用态本就解析到皮肤令牌；文件**不含后代通配符** | 12 |
+| `queue-dock` | dock | ⑭ 贴输入卡上沿叠放的后续消息队列：顶部圆角与卡片同心、40px 背景模糊已去、底色改走 `--dsw-alias-bg-layer-1` | 4 |
 | `rightbar` | rightbar | 阴影层、右栏三件套、两条分界线 | 42 |
 | `sidebar` | align · surface | 侧栏列对齐；侧栏滚动渐隐（Codex mask 斜坡）的机制与逐像素 alpha | 6 + 13 |
 | `sidebar-color` | sidebar-color | 侧栏底色对 Codex **实测**像素，亮暗同页：亮 246/233/255、暗 15/31/17（全中性，R=G=B）、各自与主区的档差、层级方向，外加每套一条反例对照 | 16 |
+| `sidebar-rows` | rows · search | ② 侧栏行：当前会话（`aria-selected`）与悬停保持可辨（**0.08 vs 0.04**，宿主两者同令牌）、长标题不溢出、置顶与归档行仍可辨、悬停露出行操作，并覆盖搜索展开与无结果两态 | 9 + 5 |
+| `text` | link_prose · chip_meta · overlay | ⑱ 正文链接与导航链接之分（只有正文保留强调色，导航继承）、UI 标签不强制等宽而代码 / 标签 / 引用保持等宽、浮层材质与长列表溢出 | 9 + 7 + 13 |
+
+本表由本机一次真实的 `npm run verify` 运行产出，数字不是手工维护的。`sidebar-keyboard` 是唯一不在此列的 spec：
+它记录的是一处宿主缺口，由 `scripts/verify.mjs` 的 `OPT_IN` 集合排除在默认全量之外，因此 `npm run verify`
+保持全绿，缺口仍在册。
 
 选项：`--host <app.asar | node_modules>` 指定宿主，`--shots <目录>` 指定截图位置（默认系统临时目录下的 `codex-ui-shots/`），
 `--verbose` 打印读数。夹具取宿主 shipped CSS 加按渲染代码复刻的 DOM，用 `getComputedStyle` 读值；它没有标题栏条、真实
@@ -328,6 +338,22 @@ npm run verify
   是同一个锚点 `_collapsed`（侧栏折叠态），替掉原先落在祖先位置的 `:has()`。`model-picker.css` 为 0。
 - 选择器不把 `:has()` 放在祖先位置：会话区流式插入节点时，Chromium 要为每个受影响的祖先重配整片子树，
   实测样式重算从 ~0.3s 涨到 4s 以上。剩下的 `:has()` 都在主语位置或只看直接子代；`model-picker.css` 由 `check.mjs` 强制为 0。
+- **侧栏的行菜单键盘用户打不开。**会话行渲染成 `div[role="treeitem"]` 且**不带 `tabindex`**（整个
+  `dsh-client-ui-workspace` bundle 只有一处 `tabindex`，在搜索框上），而行操作按钮所在的 `rowActions` 默认
+  `display:none`，只在 `:hover` 或 `menuOpen` 时露出，没有任何 `:focus-within` 规则。`display:none` 的元素不在
+  Tab 序列里，所以键盘没有任何路径能到那个菜单，纯 CSS 也造不出这条路径。已按宿主提案记在
+  `docs/host-proposal-sidebar-keyboard.zh-CN.md`；记录它的三条断言在 `scripts/specs/sidebar-keyboard.mjs`，
+  该 spec 由 `scripts/verify.mjs` 的 `OPT_IN` 集合**排除在默认全量之外** —— 主基线保持全绿，缺口照样留档。
+- **两套圆角尺度并存且未桥接。**皮肤声明 `--dsw-radius-s` / `-m` / `-l`，宿主组件消费 `--dsw-radius-sm` /
+  `-md` / `-lg`。今天两边都能解析（宿主 `ui-theme` 层提供了后一套），所以没有坏掉 —— 但宿主一旦改那套尺度，
+  皮肤自有与宿主自有的圆角就会脱节。刻意不桥接：这属于共享令牌改动。记在 `docs/codex-ui-t10-verdict.zh-CN.md`。
+- **命令面板交由宿主。**`dsh-client-ui-commands` 全包只产出**一个** `data-*`（`data-plugin-css`）；它的槽出口
+  与其它组件共用，面板根 `data-menu-material` 又是全族共用，唯一可用的区分是对兄弟做 `:not([data-trigger-menu])`，
+  已否决。Ctrl+K 已被宿主绑给 `session.search`，而且面板根本不渲染键位提示。记在 `docs/codex-ui-t12-verdict.zh-CN.md`。
+- **本轮新增的一切都是夹具验证，没有在真实 `dsh web` 实例上验过。**本轮没有起过真机实例。其中 `panels.css`
+  的滚动条工作在这里**根本无法测量**：`scripts/lib/cdp.mjs` 启动 Chromium 时带 `--hide-scrollbars`，
+  `offsetWidth - clientWidth` 恒为 0，所以「标准滚动条属性与 `::-webkit-scrollbar` 哪条生效」**没有**被实测判定 ——
+  它跟随的是 `overlays.css` 里皮肤已有的那套实现。
 
 ## 与 Codex 源码对账
 
