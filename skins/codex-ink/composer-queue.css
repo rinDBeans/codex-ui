@@ -1,0 +1,47 @@
+/* codex-ink · L3 后续消息队列（QueueDock）视觉补齐
+   ─────────────────────────────────────────────────────────────────────────
+   宿主已实现该组件的全部能力（data-queue-dock：pendingRow / preview / editor /
+   attachments / actions），本层**不改任何语义与交互**，只把它的外观并到 Codex 化的输入卡那一族。
+
+   为什么需要补（实测，非推断）：
+     队列面板紧贴在输入卡**上沿**叠放（宿主 .dock 的 margin 底边是负的 -stack-gap-3px），
+     所以它的顶部圆角必须与卡片圆角同心，否则会出现"两个不同曲率接在一起"的错位。
+     实测（headless，dock panel computed）：
+       宿主默认      backdrop=blur(40px) saturate(1.5)  bg=rgba(248,249,250,0.58)  radius=16px 16px 0 0
+       皮肤接管后    backdrop=blur(40px) saturate(1.5)  bg=rgba(255,255,255,0.88)   radius=16px 16px 0 0
+     可见皮肤只接管了填充，**没接管模糊与圆角**：
+       · 模糊 —— T08 已在 [data-menu-material] 上把 --dsw-menu-backdrop-filter 压成 none
+         （理由：blur(40px) saturate(150%) 会让菜单泛蓝、滚动时透出底）。
+         队列面板吃的是同一个令牌却不在那个锚点下，于是这层糊影漏了过来。
+       · 圆角 —— 宿主用 --dsw-radius-lg（16px），输入卡用 --dsw-radius-card（20px）。
+         两者同屏相邻，曲率不一致。
+
+   锚点：唯一稳定的是 data-queue-dock（宿主渲染代码 jsx("div",{ "data-queue-dock":"" })）。
+   面板本身没有 data-*，只能按类名后缀取；后缀写法对 CSS-Modules 哈希前缀免疫。 */
+
+/* 顶部圆角与输入卡同心；下沿本就贴住卡片，保持 0 */
+[data-queue-dock] [class*="_panel"] {
+  border-radius: var(--dsw-radius-card) var(--dsw-radius-card) 0 0;
+}
+
+/* 与 T08 同款处置：面板不吃 40px 背景模糊。
+   写 none 而不是把填充改成不透明 —— 填充已由皮肤接管为 0.88，再加模糊只会让下方列表透色。 */
+[data-queue-dock] [class*="_panel"]::before {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 暗色下描边提一档（与 overlays.css ⑱ 的菜单描边同策略） */
+[data-queue-dock] [class*="_panel"]::after {
+  border-bottom: none;
+}
+
+body[data-ds-dark-theme] [data-queue-dock] [class*="_panel"]::after {
+  border-color: var(--dsw-alias-border-l3);
+}
+
+/* 面板底色走皮肤自己的层级令牌，而不是宿主菜单面 —— 队列属于输入区，不属于浮层菜单。
+   这样半透明侧栏 / 新建页 hero 两种背景下，队列都和卡片是同一族。 */
+[data-queue-dock] [class*="_panel"]::before {
+  background: var(--dsw-alias-bg-layer-1);
+}

@@ -32,6 +32,7 @@ export const SKIN_PARTS = [
   'sidebar-surface.css', // L3 侧栏滚动渐隐
   'window-shadow.css', // L3 窗口边缘
   'composer.css', // L3 输入区
+  'composer-queue.css', // L3 后续消息队列（QueueDock）并入输入卡那一族
   'settings.css', // L3 插件设置卡
   'settings-modal.css', // L3 设置模态框 Codex 化层
   'trajectory-exit.css', // L3 轨迹视图的退出出口

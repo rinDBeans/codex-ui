@@ -1991,6 +1991,27 @@ html[data-codex-ui] [data-phase=hero] [class*="_heroWorkspaceRow"] > [class$="_w
   font-weight: 400;
 }
 
+html[data-codex-ui] [data-queue-dock] [class*="_panel"] {
+  border-radius: var(--dsw-radius-card) var(--dsw-radius-card) 0 0;
+}
+
+html[data-codex-ui] [data-queue-dock] [class*="_panel"]::before {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-codex-ui] [data-queue-dock] [class*="_panel"]::after {
+  border-bottom: none;
+}
+
+html[data-codex-ui] body[data-ds-dark-theme] [data-queue-dock] [class*="_panel"]::after {
+  border-color: var(--dsw-alias-border-l3);
+}
+
+html[data-codex-ui] [data-queue-dock] [class*="_panel"]::before {
+  background: var(--dsw-alias-bg-layer-1);
+}
+
 html[data-codex-ui] .cx-form {
   display: flex;
   flex-direction: column;
