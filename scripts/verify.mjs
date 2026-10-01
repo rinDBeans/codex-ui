@@ -67,10 +67,11 @@ for (const spec of wanted) {
   const sections = (await import(pathToFileURL(join(SPEC_DIR, spec + '.mjs')).href)).default;
   for (const [section, run] of Object.entries(sections)) {
     console.log('\n━━ ' + spec + ' / ' + section);
-    const { results, check } = checklist();
+    const { results, check, xfail } = checklist();
     let browser = null;
     const t = {
       check,
+      xfail,
       sleep,
       theme: themeCss,
       log: (...args) => { if (opts.verbose) console.log('   ', ...args); },
@@ -100,12 +101,16 @@ for (const spec of wanted) {
       await browser?.close();
     }
     all.push(...results);
-    table.push([spec, section, results.filter((r) => r.ok).length, results.length]);
+    /* 汇总行同样不把 XFAIL 计入分母，否则「已知宿主缺陷」会把整节标成 FAIL。 */
+    const scored = results.filter((r) => !r.xfail);
+    const xf = results.length - scored.length;
+    table.push([spec, section, scored.filter((r) => r.ok).length, scored.length, xf]);
   }
 }
 
 console.log('\n━━ 汇总（截图在 ' + shots + '）');
-for (const [spec, section, pass, total] of table) {
-  console.log('  ' + (pass === total ? 'PASS' : 'FAIL') + '  ' + (spec + ' / ' + section).padEnd(32) + pass + '/' + total);
+for (const [spec, section, pass, total, xf] of table) {
+  const tail = xf > 0 ? ', ' + xf + ' XFAIL' : '';
+  console.log('  ' + (pass === total ? 'PASS' : 'FAIL') + '  ' + (spec + ' / ' + section).padEnd(32) + pass + '/' + total + tail);
 }
 summarize(all);
