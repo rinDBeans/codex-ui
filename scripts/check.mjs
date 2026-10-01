@@ -891,6 +891,31 @@ attempt('双语文档成对', () => {
   }
 });
 
+/* ── 9b. 可选 spec 纪律 ───────────────────────────────────────────────────
+   verify.mjs 的 OPT_IN 把某些 spec 排除在默认全量之外。这是一把双刃剑：不加护栏，
+   它会变成「把没过的东西藏起来」的万能借口。所以钉死三条：
+     ① 排除项必须真实存在（写错名字等于静默不生效）；
+     ② 排除项必须**真的**有断言（空壳 spec 占位没有意义）；
+     ③ 排除项必须在 docs/ 里有对应提案，否则等于没有归口。
+   豁免只对「根因在宿主、本仓库改不动」成立；皮肤自己的失败一律不许进这张表。 */
+attempt('可选 spec：排除项存在、有断言、且有宿主提案归口', () => {
+  const verifySrc = read('scripts', 'verify.mjs');
+  const m = /const OPT_IN = new Set\(\[([^\]]*)\]\)/.exec(verifySrc);
+  assert(m !== null, 'verify.mjs 里找不到 OPT_IN 集合');
+  const names = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  assert(names.length > 0, 'OPT_IN 是空的 —— 机制没有实际用途，删掉它');
+  const bad = [];
+  for (const name of names) {
+    const file = join(ROOT, 'scripts', 'specs', name + '.mjs');
+    if (!fs.existsSync(file)) { bad.push(name + '（spec 不存在，OPT_IN 写错了名字）'); continue; }
+    const src = fs.readFileSync(file, 'utf8');
+    if (!/t\.(check|attempt)\(/.test(src)) bad.push(name + '（没有任何断言，是个空壳）');
+    if (!/host-proposal/.test(src)) bad.push(name + '（没在文件里引用 host-proposal，缺归口）');
+  }
+  const proposals = listFiles(join(ROOT, 'docs'), ['.md']).filter((f) => /host-proposal/.test(f.split(/[\\/]/).pop()));
+  assert(bad.length === 0, bad.join('；'));
+  return names.length + ' 个排除项 · 提案 ' + proposals.length + ' 份：' + names.join(' ');
+});
 /* ── 10. 文本编码 ─────────────────────────────────────────────────────── */
 attempt('文本为无 BOM 的 UTF-8', () => {
   const files = [...jsFiles, ...listFiles(ROOT, ['.md', '.css', '.json', '.yml', '.log'])];
