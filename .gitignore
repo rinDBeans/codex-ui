@@ -2,3 +2,7 @@ node_modules
 .DS_Store
 Thumbs.db
 scripts/host.local.json
+
+# 临时探测/草稿脚本（仓库根）。check.mjs 的「语法 N 个 JS 文件」会扫到 ./*.mjs，
+# 留在这里会污染 CI；git add -A 也容易把它们顺手提交进去（已发生过一次）。
+/.*.mjs
