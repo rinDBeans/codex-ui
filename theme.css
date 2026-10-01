@@ -1749,6 +1749,33 @@ html[data-codex-ui] div > [data-slot="sidebar.workspaces"] [class$="_list"] {
   mask-repeat: no-repeat, no-repeat;
 }
 
+html[data-codex-ui] [data-sidebar-right-panel] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html[data-codex-ui] [data-sidebar-right-panel] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html[data-codex-ui] [data-sidebar-right-panel] ::-webkit-scrollbar-thumb {
+  background: var(--dsw-alias-scrollbar-bg-l2);
+  border-radius: var(--dsw-radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+html[data-codex-ui] [data-sidebar-right-panel] ::-webkit-scrollbar-thumb:hover {
+  background: var(--dsw-alias-scrollbar-hover-l2);
+  background-clip: content-box;
+}
+
+html[data-codex-ui] [data-sidebar-right-panel] [data-dockkit-pane],
+html[data-codex-ui] [data-sidebar-right-panel] [class*="tabHostBody"],
+html[data-codex-ui] [data-sidebar-right-panel] [class*="panelBody"] {
+  overscroll-behavior: contain;
+}
+
 html[data-codex-ui][data-windows-titlebar] div:has(> [data-slot="main"]),
 html[data-codex-ui][data-windows-titlebar] div:has(> [data-slot="sidebar"]) + div,
 html[data-codex-ui][data-platform="win32"]:not([data-windows-titlebar]) div:has(> [data-slot="main"]),

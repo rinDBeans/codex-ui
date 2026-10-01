@@ -30,6 +30,7 @@ export const SKIN_PARTS = [
   'sidebar-align.css', // L3 侧栏对齐
   'sidebar-rows.css', // L3 侧栏行视觉映射（T09）
   'sidebar-surface.css', // L3 侧栏滚动渐隐
+  'panels.css', // L3 右栏面板滚动区风格统一（T11）
   'window-shadow.css', // L3 窗口边缘
   'composer.css', // L3 输入区
   'composer-queue.css', // L3 后续消息队列（QueueDock）并入输入卡那一族

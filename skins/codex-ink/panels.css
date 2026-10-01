@@ -1,0 +1,96 @@
+/* codex-ink · L3 右栏面板：滚动区风格统一（T11）
+   ─────────────────────────────────────────────────────────────────────────
+   本文件**只补空缺**，不重写既有规则。理由：panels.css 由集成方登记进 SKIN_PARTS，
+   加载顺序未定；若在此覆盖 skin.css 里已有的 data-sidebar-right-panel(4 条)/
+   guide(13 条)/toggle(1 条)，顺序一旦不对就会被静默吞掉。所以这里只写那三处**没有**覆盖的面。
+
+   T11 的其余交付项经实测**宿主已满足**，故不在此重复实现（断言在 scripts/specs/panels.mjs）：
+     · 面板容器 / 页头：宿主 ._tabHost_:not(._float_) 与 _emptyTabHost_ 的底色就是
+       var(--dsw-alias-bg-base) —— 皮肤令牌，已同族；
+     · 空态：底色 bg-base、文字 label-tertiary（实测有皮肤 rgb(118,118,118)
+       vs 无皮肤 rgb(129,133,140)），包在同一个令牌体系里；
+     · 不可用态：._unavailable 用 label-tertiary + 13px；
+     · 展开 / 收起按钮：28px 命中区、可达、图标色走 label-secondary。
+   注意别被夹具误导（这两条已写进 spec 注释，防止后来者重犯）：
+     · 宿主 .panel 是 pointer-events:none，靠 dockkit 的 ._float_ / ._tabHost_ 把交互开回来；
+       把按钮直接挂 .panel 下会量到 pointer-events:none，那是夹具不忠实、不是宿主缺陷。
+     · 空态外观来自 dockkit 的类（_emptyTabHost_ / _empty_），宿主从不按
+       [data-dockkit-empty] 写样式；只挂 data 属性会量到全透明。
+
+   ── 唯一实测缺口：右栏滚动区没跟上皮肤的滚动条约定 ──
+   皮肤只在 [data-trigger-menu] / [data-menu-material] 上给了细滚动条（overlays.css ⑱）。 */
+
+/* ── 滚动条：只走 ::-webkit-scrollbar 一条路径（本文件的唯一决定）─────────────────
+   panels.css **不写** scrollbar-color，**也不写** scrollbar-width。
+
+   依据要分清「量到的」与「推的」，本文件只按前者写：
+
+   ① 量得到的（getComputedStyle，声明是否生效可测）：
+        scrollbar-color: var(--dsw-radius-sm) transparent
+          → computed = auto   ← --dsw-radius-sm 是**长度**不是颜色，整条声明被浏览器丢弃；
+        scrollbar-color: var(--dsw-alias-scrollbar-bg-l2) transparent
+          → computed = rgba(118,118,118,0.5) rgba(0,0,0,0)   ✓ 生效。
+
+   ② 量不到的：滚动条的**绘制与占位**。scripts/lib/cdp.mjs:29 启动 Chromium 时带
+      --hide-scrollbars，offsetWidth − clientWidth 恒为 0。集成方在同一环境复现过五组对照
+      （仅伪元素 / ＋width:thin / ＋color / 仅 width / 仅 color），**gutter 全部为 0**。
+      也就是说「标准属性与伪元素哪条最终生效」在本环境**无法用像素判定**。
+      本注释早前引用的 gutter=8/10/15 那张表在此环境复现不出来，已删除，不再作为依据。
+
+   ③ 这条取舍是**与皮肤既有实现对齐**，不是「实测证明伪元素会赢」：
+      overlays.css ⑱ 是本仓库唯一的滚动条实现，只写 ::-webkit-scrollbar，两个标准属性都不写
+      （逐条 grep 确认）。右栏若引入标准属性，就会成为同屏唯一走另一套机制的区域 ——
+      观感即便一致，也等于多一个来源，日后改色要改两处。
+      已知代价（如实记录）：若某天引擎让标准属性优先，右栏会丢细滚动条。这条只能靠真机复核，
+      本夹具证不了。
+
+   附（这条决定先后纠正过的两个错，留给后来者）：
+     ① 曾写作 scrollbar-color: var(--dsw-radius-sm) transparent —— 那是**圆角**令牌（长度），
+        对 scrollbar-color 非法，浏览器在计算值阶段丢弃整条声明、computed 回落 auto，
+        即「注释记录了问题、声明本身却没生效」；
+     ② 之后又同时写 scrollbar-color 与 ::-webkit-scrollbar-thumb，并断言「两条路径取色同源」——
+        按上面的实测，两条路径不可能同时生效，那条断言描述的是一个不存在的状态，已删除。
+   静态对账见 scripts/specs/panels.mjs「只用 ::-webkit-scrollbar」那一条（唯一一条）。 */
+
+/* WebKit 走 ::-webkit-scrollbar（width/height 对 Chromium 仍生效）。
+   尺寸与取色照抄 overlays.css ⑱ 的菜单那一套，保持同屏滚动条是同一种观感。
+   这条是**后代伪元素**选择器，天然命中面板下所有滚动容器的滚动条，不需要通配符参与 ——
+   也就避开了本仓库被咬过一次的性能坑（docs/archive/pr3-64f4d60.patch：去掉「落在祖先位置、
+   目标又是常见元素」的选择器后，真实流式基准 RecalcStyle 4264ms → 267ms，-94%）。
+   滚动条占位在本夹具里量不到（cdp.mjs 启动时带 --hide-scrollbars），
+   所以「细」由静态断言保证，不由像素保证 —— 如实记录，不假装量过。 */
+[data-sidebar-right-panel] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+[data-sidebar-right-panel] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-sidebar-right-panel] ::-webkit-scrollbar-thumb {
+  background: var(--dsw-alias-scrollbar-bg-l2);
+  border-radius: var(--dsw-radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+[data-sidebar-right-panel] ::-webkit-scrollbar-thumb:hover {
+  background: var(--dsw-alias-scrollbar-hover-l2);
+  background-clip: content-box;
+}
+
+/* 滚动时不要把滚动链带到中列（与 overlays.css ⑱ 的 overscroll-behavior: contain 同策略）。
+   tabHostBody 来自 dockkit（前端样式表），panelBody 来自宿主 SidebarRight —— 两者都实测存在：
+     · tabHostBody —— 在前端样式表（dsh-web-frontend/dist/assets/index-*.css）里实测存在，
+       且 ._tabHostBody_xxx{position:relative;min-width:0}。注意它**不等于**宿主 SidebarRight
+       的 tabBody：/_tabBody_/ 在前端表里为 false，而 SidebarRight 的 mapFor 里键名是 tabBody。
+       两者是不同来源的不同类名，不能互相替换。
+     · panelBody —— 同时匹配宿主 SidebarRight 的 panelBody（mapFor 实测有）。
+     · data-dockkit-pane / data-dockkit-empty / data-sidebar-right-guide —— 宿主渲染代码里
+       真实发出的 data-*（grep dsh-client-ui-sidebar-right 的 data-* 清单可复现）。 */
+[data-sidebar-right-panel] [data-dockkit-pane],
+[data-sidebar-right-panel] [class*="tabHostBody"],
+[data-sidebar-right-panel] [class*="panelBody"] {
+  overscroll-behavior: contain;
+}
