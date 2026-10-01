@@ -1,0 +1,98 @@
+{
+  "schema": "codex-ui-recon-manifest-v1",
+  "generatedAt": "2026-09-30T21:40:00+08:00",
+  "sourceType": "real-profile-copy",
+  "note": "由 T00 采集：把日常 DSH_HOME 整体复制到 <TEMP>/codex-ui-audit/real-home 后启动，未修改日常 profile（绝对路径按仓库规矩脱敏）。",
+  "appVersion": "codex-ui@0.7.1",
+  "hostVersion": "dsh 0.2.0-rc.2",
+  "officialCodexAppx": "OpenAI.Codex_26.928.2636.0_x64__2p2nqsd0c76g0",
+  "codexUiCheckout": "<codex-ui 主检出>",
+  "commit": "7186447",
+  "captureDate": "2026-09-30",
+  "viewport": {
+    "width": 1440,
+    "height": 960
+  },
+  "dpr": 1.5,
+  "osScale": "unknown-not-recorded",
+  "rootFontSize": "unknown-not-recorded",
+  "language": "zh-CN",
+  "theme": [
+    "light",
+    "dark"
+  ],
+  "layoutState": "settings modal open; right panel open",
+  "profilePlugins": [
+    "dshmarket",
+    "dsh-llm-verifier",
+    "dsh-context",
+    "dsh-smooth-stream",
+    "dsh-ivory",
+    "dsh-theme-mineradio",
+    "@linxin666/dsh-web-all",
+    "@michengai/dsh-archive-manager",
+    "dsh-theme-taojian",
+    "dsh-font-switcher",
+    "@eddyskywalker/dsh-chatgpt-subscription",
+    "codex-ui"
+  ],
+  "files": [
+    {
+      "name": "c1-04-search-filter.png",
+      "theme": "light",
+      "state": "settings search filtering"
+    },
+    {
+      "name": "c1-05-search-empty.png",
+      "theme": "light",
+      "state": "settings search empty result"
+    },
+    {
+      "name": "c1-06-hidden-durability.png",
+      "theme": "light",
+      "state": "hidden item durability"
+    },
+    {
+      "name": "c1-07-reopen-replay.png",
+      "theme": "light",
+      "state": "close and reopen replay"
+    },
+    {
+      "name": "c1-08-third-party.png",
+      "theme": "light",
+      "state": "third-party settings page"
+    },
+    {
+      "name": "c1-09-dark.png",
+      "theme": "dark",
+      "state": "dark theme"
+    },
+    {
+      "name": "gui-real.log",
+      "kind": "log",
+      "run": "scripts/live/gui.mjs",
+      "result": "12/14"
+    },
+    {
+      "name": "settings-modal-real.log",
+      "kind": "log",
+      "run": "scripts/live/settings-modal.mjs",
+      "result": "84/94"
+    },
+    {
+      "name": "gui-live.log",
+      "kind": "log",
+      "run": "scripts/live/gui.mjs",
+      "env": "bare web profile",
+      "result": "14/14"
+    },
+    {
+      "name": "settings-modal-live.log",
+      "kind": "log",
+      "run": "scripts/live/settings-modal.mjs",
+      "env": "bare web profile",
+      "result": "83/94"
+    }
+  ],
+  "caveat": "codexUiCheckout 指向主检出（未含 worktree 的 T01–T05 修复）；本轮 worktree 修复尚未合并到该检出。"
+}

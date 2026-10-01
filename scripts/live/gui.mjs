@@ -39,6 +39,10 @@ function probeFrame() {
   const panel = document.querySelector('[data-sidebar-right-panel]');
   return {
     centerShadow: cs(center).boxShadow,
+    dark: document.body.hasAttribute('data-ds-dark-theme'),
+    /* 主题插件（dsh-ivory / dsh-taojian …）会在 body 上挂类名并用 !important 接管外壳属性；
+       基线必须记下它，否则分不清「codex-ink 变了」还是「别人接管了」。 */
+    theme: document.body.className || '(none)',
     centerRadius: cs(center).borderTopLeftRadius,
     sidebarBorder: cs(side).borderRightWidth + ' ' + cs(side).borderRightColor,
     panelShadow: panel ? cs(panel).boxShadow : null,
@@ -197,9 +201,24 @@ try {
   }
 
   /* 只对这次真的量到的状态判定。 */
-  check('中列 0.5px 发丝线 + 24px 环境影', /\.5px/.test(idle.centerShadow) && /24px/.test(idle.centerShadow), idle.centerShadow);
+  /* 中列环境影浅/深两套基线（window-shadow.css:54 亮 13px @7% / :64 暗 24px @50%）。
+     旧断言写死 24px，亮色下必失败 —— 按当前主题分别验证，不改控件去迎合脚本。 */
+  const centerAmbient = idle.dark ? '24px' : '13px';
+  check('中列 0.5px 发丝线 + ' + centerAmbient + ' 环境影（' + (idle.dark ? '暗' : '亮') + '）',
+    /\.5px/.test(idle.centerShadow) && idle.centerShadow.includes(centerAmbient),
+    idle.centerShadow + ' dark=' + idle.dark);
   check('中列圆角 16px', idle.centerRadius === '16px', idle.centerRadius);
-  check('侧栏无右边框', String(idle.sidebarBorder).startsWith('0px'), idle.sidebarBorder);
+  /* 侧栏右边框：codex-ink 的既定行为是**保留宿主那条发丝线、只把它压到 l1**
+     （window-shadow.css:108 的注释写得很明确），不是把它去掉。
+     旧断言写死 "0px"，只在「宿主没画 + 没有主题插件接管」的裸环境里成立；
+     真实组合里 dsh-ivory 以 !important 画了 0.5px（CDP 匹配规则实测：
+     body.dsh-ivory:not(.dshcs-contract-mismatch) .pI_x6G_sidebarCol{border-right:.5px solid var(--cl-border)!important}），
+     于是成了假失败 —— 那是别人的属性，不是 codex-ink 的。
+     改判为「发丝线」契约：≤1px 才算通过，粗线仍旧算回归；并把主题类名带进输出。 */
+  const sideBorderW = parseFloat(String(idle.sidebarBorder)) || 0;
+  check('侧栏右边框是发丝线（≤1px，非粗线）',
+    sideBorderW <= 1,
+    idle.sidebarBorder + ' · theme=' + idle.theme);
   check('左分界线无悬停渐变', idle.handleLeft !== null && idle.handleLeft.grad === false, JSON.stringify(idle.handleLeft));
   /* 右栏已开着时（宿主记得上一次状态），IDLE 那一帧就能量到面板。 */
   const panelState = panel ?? (idle.panelShadow && idle.panelShadow !== 'none' ? idle : null);
@@ -208,6 +227,32 @@ try {
     check('右栏面板影只往上泄（负 spread）', /-12px 24px -12px/.test(String(panelState.panelShadow)), panelState.panelShadow);
     check('右分界线带渐变', panelState.handleRight !== null && panelState.handleRight.grad === true, JSON.stringify(panelState.handleRight));
   }
+  /* ── T06 / UX-08：页签隐去受「出口就绪」门控 ────────────────────────────
+     ⑬ 隐去页签的前提，是 trajectory-exit.js 能可靠找回对话页签（盖 body[data-codex-ui-te-ready]）。
+     两段都验：就绪时隐去（⑬ 视觉保持）；把标记摘掉后必须**重新可见**
+     —— 摘掉还看不见，说明隐去是写死的，认不出页签的用户就无路可退。 */
+  const navProbe = await page.evaluate(() => {
+    const tabs = document.querySelector('[data-conversation-tabs]');
+    return {
+      hasNode: tabs !== null,
+      ready: document.body.hasAttribute('data-codex-ui-te-ready'),
+      visible: tabs !== null && tabs.offsetParent !== null,
+    };
+  });
+  if (navProbe.hasNode) {
+    check('T06 出口就绪标记已盖（找得回对话页签）', navProbe.ready === true, JSON.stringify(navProbe));
+    check('T06 就绪时页签隐去（⑬ 视觉保持）', navProbe.visible === false, JSON.stringify(navProbe));
+    const afterDrop = await page.evaluate(() => {
+      document.body.removeAttribute('data-codex-ui-te-ready');
+      const tabs = document.querySelector('[data-conversation-tabs]');
+      return { visible: tabs !== null && tabs.offsetParent !== null };
+    });
+    check('T06 摘掉标记后页签重新可见（不会无路可退）', afterDrop.visible === true, JSON.stringify(afterDrop));
+    await page.evaluate(() => document.body.setAttribute('data-codex-ui-te-ready', ''));
+  } else {
+    console.log('SKIP T06 导航：当前页没有页签条节点（hero/空白态），本组不判定');
+  }
+
   if (pendingSnaps.length > 0) {
     check('pending 窗口内 aria-busy', pendingSnaps.some((x) => x.busy === 'true'), JSON.stringify(pendingSnaps.map((x) => x.busy)));
     check('pending 窗口内整列 disabled', pendingSnaps.some((x) => x.disabled >= 2), JSON.stringify(pendingSnaps.map((x) => x.disabled)));
@@ -219,7 +264,9 @@ try {
     if (bFace.open !== null && bFace.open.ticks.length >= 2) {
       const ticks = bFace.open.ticks;
       const step = (ticks.at(-1) - ticks[0]) / (ticks.length - 1);
-      check('B 面：档位等距、首档在 14px', Math.abs(ticks[0] - 14) <= 1 && ticks.every((x, i) => Math.abs(x - (ticks[0] + step * i)) <= 1), JSON.stringify(ticks));
+      /* 首档 = THUMB_SIZE/2 = 8px（view.js:15 THUMB_SIZE=16；component.js:542 同式）。
+         旧断言写死 14px 是 THUMB_SIZE=28 时代的残留 —— 不把控件改成 28px 圆旋钮来迎合它。 */
+      check('B 面：档位等距、首档在 8px', Math.abs(ticks[0] - 8) <= 1 && ticks.every((x, i) => Math.abs(x - (ticks[0] + step * i)) <= 1), JSON.stringify(ticks));
       check('B 面：拇指落在生效档上', Math.abs(bFace.open.thumb - ticks[bFace.open.now]) <= 1, bFace.open.thumb + ' vs ' + ticks[bFace.open.now]);
       check('B 面：键盘改档写进宿主的 store（宿主自己的触发器标题跟着变）', bFace.changed.after !== null && bFace.changed.after !== bFace.changed.before && bFace.changed.mine === bFace.changed.after, JSON.stringify(bFace.changed));
       check('B 面：改档往返中列表不清空', bFace.changed.rows === bFace.open.rows, bFace.changed.rows + ' / ' + bFace.open.rows);

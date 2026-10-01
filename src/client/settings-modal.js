@@ -19,12 +19,27 @@
  *   · 每个注入节点都带 data-codex-ui-injected="settings-modal"，创建前先查标记；
  *   · 观察 document.body 的 childList，overlay 被卸载/重建一次就重放一次。
  *
- * ⚠ 取舍一：**顺序调整走 CSS flex order，不移动宿主节点**（任务书二选一里的前者）。
- *   侦察 §j 实测：宿主按 order 排序后渲染，重排 DOM 顺序会与 React 的 key 协调冲突、重渲染时被还原。
+ * ⚠ 取舍一：**顺序调整走 CSS flex order，不移动宿主节点**。
+ *   这是**政策选择**（方案 §7.2「宿主节点不搬移、不克隆」），**不是技术限制** —— 2026-09-30 实测：
+ *   手工把「订阅服务」搬到「内置插件」之后，切页 / 搜索过滤 / 清空搜索三次重渲染都没有把它还原
+ *   （React 按 key 协调自己的子节点，key 顺序没变就不动 DOM）。所以旧注释里
+ *   「重排 DOM 顺序会与 React 的 key 协调冲突、重渲染时被还原」**与实测不符**，已更正。
+ *   搬节点在技术上可行，但会让宿主节点脱离 React 的模型，取舍上仍选 flex order。
  *   本次探针复核：13 个 navCell 的 inline style 全为空、computed order 全为 0 —— order 是一个
  *   **没有人用过**的布局槽位，所以给宿主 cell 写 style.order 是安全的（React 不认它、也不会覆盖它）。
  *   收益：宿主节点零移动，点击 / 渲染 / 第三方项进出全部原样；代价：键盘 Tab 顺序仍是 DOM 顺序，
  *   视觉顺序 ≠ 焦点顺序，属已知可及性瑕疵（分组本身不改变焦点可达性，只是顺序不同）。
+ *
+ * ⚠ **为什么不用数据层排序（UX-06 的「只有宿主允许数据层排序时才重排」，2026-09-30 复核）**：
+ *   宿主确实按数据层排序渲染 —— dsh-client-ui-settings-general 里是
+ *   rows = ctx.slots.entries('settings.section') 取 e.options.order 排序。
+ *   但 slots 服务只暴露 register / isLive / entries / entriesOfSlot / spec，
+ *   **没有改动已有 entry 的 order 的 API**；而这些 section 由别的插件注册，codex-ui 替不了它们排序。
+ *   实测宿主 DOM 序本来就是交错的
+ *   （个人 / 通用设置 / 编码 / 模型 / 集成 / 内置插件 / Agent 预设 / 其他 / Ivory 主题 / 订阅服务），
+ *   「按连续顺序分组」做不到，要分组就只能重排。
+ *   结论：UX-06 在当前约束下**不可满足** —— 维持本取舍，也不用正 tabindex 之类的手段掩盖焦点顺序。
+ *   要真正做到「视觉顺序 = 焦点顺序」，唯一路径是允许搬宿主节点（需先改方案 §7.2）。
  *
  * ⚠ 取舍二：**隐藏项用「属性 + 类名」双写**。
  *   本次探针实测（关键，比侦察报告的措辞更具体）：宿主在**选中态从某一项搬走时**会把那一项的
@@ -45,6 +60,8 @@
  *     · CSS 以**属性** [data-cx-sm-hidden] 为准（耐久，类名被抹也不影响隐藏）；
  *     · JS 在下一帧把类名补回（subtree 观察器驱动），供只认 .cx-sm-hidden 的样式使用。
  */
+
+import { isEnglish } from './host.js';
 
 /* ── 稳定锚点 ─────────────────────────────────────────────────────── */
 
@@ -107,8 +124,50 @@ for (const group of GROUPS) {
   GROUP_RANK.set(group.id, rank);
   for (const item of group.items) GROUP_OF_LABEL.set(item.trim().toLowerCase(), group.id);
 }
+/**
+ * 组 id → 该组各项的 **slot id**（与 GROUPS[].items 平行同序）。
+ * 为什么要它：宿主侧栏项的**文字是按语言解析出来的**（英文环境把「通用设置」渲染成 "General"），
+ * 而 slot id（general / models / plugins …）与语言无关，才是稳定身份。
+ * 数据来源：ctx.slots.entries('settings.section')，宿主自己也用它的 options.order 排序渲染，
+ * 所以这一串 id 与 navList 里的 button **一一对应、同序**。
+ * 都不认识的 id 才回落到标签表；标签也不认识 → 「其他」。
+ */
+const GROUP_IDS = {
+  personal: ['account', 'general', 'skin-center', 'pet', 'dsh-usage'],
+  integrations: ['plugins', 'web-ui-plugins', 'subscription-hub', 'dsh-mnemon', 'market'],
+  coding: ['models', 'agent-presets', 'llm-verifier'],
+  archive: ['archived-sessions', 'dsh-session-archive'],
+};
+/** slot id → 组 id；以及 slot id → 组内名次。 */
+const GROUP_OF_ID = new Map();
+const GROUP_RANK_ID = new Map();
+for (const group of GROUPS) {
+  const rank = new Map();
+  (GROUP_IDS[group.id] ?? []).forEach((ids, index) => { GROUP_OF_ID.set(ids, group.id); rank.set(ids, index); });
+  GROUP_RANK_ID.set(group.id, rank);
+}
+/* 英文标签兜底（实测值：English 环境下宿主渲染出来的标签）。id 那条路走通时用不到，
+   这是宿主哪天不再暴露 id 时的第二道网。 */
+for (const [enLabel, groupId] of [['general', 'personal'], ['models', 'coding'], ['built-in plugins', 'integrations'],
+  ['agent presets', 'coding'], ['plugins', 'integrations'], ['subscriptions', 'integrations']]) {
+  if (!GROUP_OF_LABEL.has(enLabel)) GROUP_OF_LABEL.set(enLabel, groupId);
+}
+
 /** 渲染顺序：已知组按 GROUPS 顺序，兜底组永远最后。 */
 const GROUP_SEQUENCE = [...GROUPS, OTHER_GROUP];
+
+/**
+ * 插件自有文案：**中英成对**（UX-07）。语言由宿主 locale 决定，不能只写中文 ——
+ * 英文环境里「← 返回应用」「搜索设置」会和宿主界面语言打架。
+ * 不放进 GROUPS 字面量里：那份字面量是 live 脚本对账契约的一部分（见 settings-modal.mjs 的
+ * 前置检查按 { id, label, items } 解析），改形状会把 T01 的对账搞崩。
+ */
+const TEXT = {
+  zh: { back: '返回应用', search: '搜索设置', searchPlaceholder: '搜索设置...', empty: '没有匹配的设置项' },
+  en: { back: 'Back to app', search: 'Search settings', searchPlaceholder: 'Search settings...', empty: 'No matching settings' },
+};
+/** 组标题的英文名，按组 id 查；查不到就回落到 GROUPS 里的中文标签。 */
+const GROUP_LABEL_EN = { personal: 'Personal', integrations: 'Integrations', coding: 'Coding', archive: 'Archived', other: 'Other' };
 
 /* ── 小工具 ───────────────────────────────────────────────────────── */
 
@@ -174,6 +233,18 @@ function cellLabel(cell) {
 /** 标签 → 组 id；匹配不上就是兜底组。 */
 const groupOfLabel = (label) => GROUP_OF_LABEL.get(normalizeLabel(label)) ?? OTHER_GROUP.id;
 
+/**
+ * 归类：**slot id 优先**（与语言无关），取不到再按标签（中/英），都不认识进「其他」。
+ * @param label - 宿主项当前语言下的可见文字。
+ * @param slotId - 由 sectionIdsByOrder() 对齐出来的 slot id；'undefined' 表示这批不可用。
+ * @returns 组 id。
+ */
+const groupOf = (label, slotId) => (
+  slotId !== undefined && slotId !== null && GROUP_OF_ID.has(slotId)
+    ? GROUP_OF_ID.get(slotId)
+    : groupOfLabel(label)
+);
+
 /* ── 面板定位（全部走稳定锚点，找不到就返回 null） ────────────────────── */
 
 /** 找设置面板并补盖自有锚点（幂等）；不在 DOM 里返回 null。 */
@@ -223,6 +294,15 @@ let active = null;
  */
 export function installSettingsModal(ctx) {
   if (typeof document === 'undefined' || document === null) return () => {};
+  /* 语言由宿主 locale 决定，插件自有文案成对（UX-07）。认不出就当中文。
+     每次取用时现读：切语言会引发 DOM 变更，重放时文案自然刷新。 */
+  /* 实测（2026-09-30，真实组合）：ctx.reflect.get('locale') 拿得到 LocaleRuntime
+     （reflect=object / getSnapshot 存在），而直接访问 ctx.locale 会 THREW —— 它没在 inject 里声明。
+     另：页面载入瞬间快照还是 {"active":"zh"}（revision 25），要等设置文档到达才解析成 en，
+     所以文案**必须每次重放都重写**，只写一次会永远停在中文。 */
+  const locale = (() => { try { return ctx.reflect.get('locale'); } catch { return null; } })();
+  const T = () => (isEnglish(locale) ? TEXT.en : TEXT.zh);
+  const groupLabelOf = (group) => (isEnglish(locale) ? (GROUP_LABEL_EN[group.id] ?? group.label) : group.label);
   if (active !== null) {
     try { active.dispose(); } catch { /* 撤不干净也不能阻断新的一次安装 */ }
     active = null;
@@ -281,7 +361,8 @@ export function installSettingsModal(ctx) {
     pressEscape();
     requestAnimationFrame(() => requestAnimationFrame(() => {
       if (disposed) return;
-      if (findPanel() !== null) return;      /* Escape 生效了 */
+      /* 面板已消失 = Escape 生效，到此为止；仍存在才走下面的宿主关闭按钮兜底。 */
+      if (findPanel() === null) return;
       const button = closeButton(panel);
       if (button === null) {
         warnOnce('Escape 没关掉设置，也找不到结构上的关闭按钮，放弃关闭', panel);
@@ -291,15 +372,48 @@ export function installSettingsModal(ctx) {
     }));
   }
 
+  /**
+   * 把「插件自有文案」按当前宿主语言重写一遍。
+   * 必须在**每次重放**时都跑：运行中切语言不会重建我们注入的节点，
+   * 只在创建时写一次的版本会永远停在旧语言（实测：切到 English 后按钮仍写「返回应用」）。
+   * 改的都是自有节点的文本/属性，宿主节点一个不碰。
+   */
+  function relabel(list, back, search) {
+    const t = T();
+    /* ⚠ 必须「值不同才写」：本函数每次重放都跑，而列表观察器开着 subtree + childList，
+       无脑写 textContent 会造出新的 mutation → 观察器再调度 inject → 自触发循环。
+       宿主项有自己的收敛性（注释见 observeList），这里要保持同一条不变量。 */
+    const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
+    const setAttrIf = (el, name, value) => { if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
+    if (back !== null) {
+      setAttrIf(back, 'aria-label', t.back);
+      const label = back.querySelector('.cx-sm-back-text');
+      if (label !== null) setText(label, t.back);
+    }
+    if (search !== null) {
+      const input = findPart(search, 'search-input');
+      if (input !== null) {
+        setAttrIf(input, 'placeholder', t.searchPlaceholder);
+        setAttrIf(input, 'aria-label', t.search);
+      }
+    }
+    for (const group of GROUP_SEQUENCE) {
+      const header = findPart(list, 'group:' + group.id);
+      if (header !== null) setText(header, groupLabelOf(group));
+    }
+    const empty = findPart(list, 'empty');
+    if (empty !== null) setText(empty, t.empty);
+  }
+
   /** 建「← 返回应用」。 */
   function makeBack(panel) {
     const back = makeNode('div', 'cx-sm-back', 'back');
     back.setAttribute('role', 'button');
     back.setAttribute('tabindex', '0');
-    back.setAttribute('aria-label', '返回应用');
+    back.setAttribute('aria-label', T().back);
     const arrow = makeNode('span', 'cx-sm-back-icon', null, '\u2190');
     arrow.setAttribute('aria-hidden', 'true');
-    const text = makeNode('span', 'cx-sm-back-text', null, '返回应用');
+    const text = makeNode('span', 'cx-sm-back-text', null, T().back);
     back.appendChild(arrow);
     back.appendChild(text);
     back.addEventListener('click', () => requestClose(panel));
@@ -316,8 +430,8 @@ export function installSettingsModal(ctx) {
     const box = makeNode('div', 'cx-sm-search', 'search');
     const input = makeNode('input', 'cx-sm-search-input', 'search-input');
     input.setAttribute('type', 'search');
-    input.setAttribute('placeholder', '搜索设置...');
-    input.setAttribute('aria-label', '搜索设置');
+    input.setAttribute('placeholder', T().searchPlaceholder);
+    input.setAttribute('aria-label', T().search);
     input.setAttribute('autocomplete', 'off');
     input.setAttribute('spellcheck', 'false');
     const run = () => makeFilter(input.value);
@@ -341,25 +455,54 @@ export function installSettingsModal(ctx) {
    * @param list - navList。
    * @param cells - 宿主项（保持 DOM 顺序）。
    */
+  /**
+   * 宿主侧栏项的 slot id 序列：ctx.slots.entries('settings.section') 按 options.order 升序
+   * —— 与宿主自己的 rows 排序逐字相同，所以与 navList 里的 button 同序。
+   * 读不到就返回空数组，调用方整批回落到标签匹配。
+   */
+  function sectionIdsByOrder() {
+    try {
+      const rows = ctx.slots.entries('settings.section');
+      if (!Array.isArray(rows)) return [];
+      return rows
+        .map((entry) => {
+          const options = entry === null || entry === undefined ? undefined : entry.options;
+          return {
+            id: options === undefined || options.id === undefined ? '' : options.id,
+            order: options === undefined || options.order === undefined ? 0 : options.order,
+          };
+        })
+        .sort((a, b) => a.order - b.order)
+        .map((row) => row.id);
+    } catch { return []; }
+  }
+
   function syncGroups(list, cells) {
     if (cells.length === 0) return;
+    /* 条数与宿主项对得上才敢按位置对齐 id —— 对不上就整批回落标签匹配。
+       宁可退回旧行为，也不能拿着错位的 id 分组。 */
+    const ids = sectionIdsByOrder();
+    const useIds = ids.length === cells.length;
     const buckets = new Map([[OTHER_GROUP.id, []]]);
     for (const group of GROUPS) buckets.set(group.id, []);
     cells.forEach((cell, domIndex) => {
       const label = cellLabel(cell);
-      const id = groupOfLabel(label);
+      const slotId = useIds ? ids[domIndex] : undefined;
+      const id = groupOf(label, slotId);
       setAttr(cell, GROUP_ATTR, id);
-      buckets.get(id).push({ cell, domIndex, label });
+      buckets.get(id).push({ cell, domIndex, label, slotId });
     });
-    /* 已知组按映射表名次排；表里没写到的（不该有，防御性）排在该组末尾，再按宿主原序。 */
+    /* 组内顺序：slot id 有名次就用 id 名次（语言无关），否则回落到标签名次；
+       都没写到的（不该有，防御性）排在该组末尾，再按宿主原序。 */
     for (const group of GROUPS) {
       const rank = GROUP_RANK.get(group.id);
+      const idRank = GROUP_RANK_ID.get(group.id);
       const members = buckets.get(group.id);
-      members.sort((a, b) => {
-        const ra = rank.get(normalizeLabel(a.label)) ?? Number.MAX_SAFE_INTEGER;
-        const rb = rank.get(normalizeLabel(b.label)) ?? Number.MAX_SAFE_INTEGER;
-        return ra - rb || a.domIndex - b.domIndex;
-      });
+      const rankOf = (m) => {
+        if (m.slotId !== undefined && idRank.has(m.slotId)) return idRank.get(m.slotId);
+        return rank.get(normalizeLabel(m.label)) ?? Number.MAX_SAFE_INTEGER;
+      };
+      members.sort((a, b) => rankOf(a) - rankOf(b) || a.domIndex - b.domIndex);
     }
     /* 空组不渲染 —— 「账号与余额」未登录时缺位，组里其余项照常。 */
     const rendered = GROUP_SEQUENCE.filter((group) => buckets.get(group.id).length > 0);
@@ -371,7 +514,7 @@ export function installSettingsModal(ctx) {
       const first = members[0].cell;
       let header = findPart(list, 'group:' + group.id);
       if (header === null) {
-        header = makeNode('div', 'cx-sm-group', 'group:' + group.id, group.label);
+        header = makeNode('div', 'cx-sm-group', 'group:' + group.id, groupLabelOf(group));
         header.setAttribute(GROUP_ATTR, group.id);
         header.setAttribute('aria-hidden', 'true');
         list.insertBefore(header, first);
@@ -379,9 +522,12 @@ export function installSettingsModal(ctx) {
         /* 标题是自己的节点，可以自由移动：只在位置不对时才动。
            宿主项一个都不动 —— 组内顺序全靠下面的 flex order 实现。 */
         if (header.nextElementSibling !== first) list.insertBefore(header, first);
-        if (header.textContent !== header.getAttribute('data-cx-sm-label')) header.textContent = group.label;
+        /* ⚠ 比较键必须与写入值同源：早先这里写 group.label（中文），而 relabel() 写本地化名，
+           两者互相判定「值变了」→ 每次重放都造 mutation → 观察器自触发振荡。
+           统一用 groupLabelOf 之后，收敛与 observeList 的不变量一致。 */
+        const headerText = groupLabelOf(group);
+        if (header.textContent !== headerText) header.textContent = headerText;
       }
-      setAttr(header, 'data-cx-sm-label', group.label);
       liveHeaders.add(header);
       setAttr(header, GROUP_ATTR, group.id);
       setOrder(header, slot);
@@ -539,7 +685,7 @@ export function installSettingsModal(ctx) {
     const needed = needle !== '' && total === 0;
     let empty = findPart(list, 'empty');
     if (needed && empty === null) {
-      empty = makeNode('div', 'cx-sm-empty', 'empty', '没有匹配的设置项');
+      empty = makeNode('div', 'cx-sm-empty', 'empty', T().empty);
       empty.setAttribute('role', 'status');
       list.appendChild(empty);
     }
@@ -624,6 +770,7 @@ export function installSettingsModal(ctx) {
       nav.insertBefore(search, back.nextSibling);
     }
 
+    relabel(list, back, search);
     syncGroups(list, cells);
     const content = findContent(panel);
     if (content !== null) syncPagehead(panel, content, cells);

@@ -1,5 +1,5 @@
 /* codex-ink · L3 组件契约
-   ①–⑪ 通用：焦点环、链接、可点元素、卡片、徽标、tag tone、侧栏、元信息、中文豁免、reduced-motion。
+   ①–⑪ 通用：焦点环、链接（按 prose 作用域染 alias-link）、可点元素、卡片、徽标、tag tone、侧栏、元信息、中文豁免（已并入 ⑤ / ⑨）、reduced-motion。
        其中 data-dsh-part / data-dsh-surface / data-tag-tone 由 skin-center 适配器打（宿主本身不打），皮肤加载器路线用得到。
    ⑫ 宿主模型菜单（A 面：设置里关掉模型选择器时生效）   ⑬ 输入区顶栏   ⑮ 侧栏开合动效   ⑯ 右栏展开引导   ⑰ composer 底部控件
    锚点优先用语义属性；宿主没有 data-* 的地方用 CSS-Modules 类名的后缀写法（[class$=…]），不用哈希全名。 */
@@ -10,17 +10,43 @@
   outline-offset: 2px;
 }
 
-/* ② 链接：强调色，hover 下划线 */
+/* ② 链接：默认"点状下划线 + 继承色" —— 与 codex 文档外链风格一致；不主动染蓝以免
+   把菜单/按钮/导航里的 <a> 也拉成强调色（plan §6.1/§7.1「正文 link 与装饰 accent 分语义」）。
+   正文语境（markdown 容器，由宿主或 skin-center 适配器打 data-dsh-part="prose"|"article"）
+   才染 alias-link；hover 下划线。导航 / 菜单 / 按钮内的 <a> 继承父级前景、不带下划线。 */
 a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/* 按钮 / 菜单项 / 导航里的 <a> 不带下划线（保持各自的视觉层级）。 */
+button a,
+[role="button"] a,
+[role="menuitem"],
+[role="tab"] a,
+nav a {
+  text-decoration: none;
+}
+
+/* 正文语境（markdown 容器）才染 alias-link；hover 加实下划线。 */
+[data-dsh-part="prose"] a,
+[data-dsh-part="article"] a {
   color: var(--dsw-alias-link);
   text-decoration: none;
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
 }
 
-a:hover,
-a:focus-visible {
+[data-dsh-part="prose"] a:hover,
+[data-dsh-part="prose"] a:focus-visible,
+[data-dsh-part="article"] a:hover,
+[data-dsh-part="article"] a:focus-visible {
   text-decoration: underline;
+  text-decoration-style: solid;
 }
 
 /* ③ 可点元素：手型光标 + 150ms 过渡 */
@@ -77,12 +103,10 @@ button[aria-disabled="true"],
   border-radius: var(--dsw-radius-l);
 }
 
-/* ⑤ 徽标 / chip：mono pill */
-[data-dsh-part="composer-chip"],
+/* ⑤ 徽标 / chip：只把 "真 chip"（chip / ref）做成 mono pill；tag-chip / tag-badge / composer-chip
+   是 UI 标签（计划板状态徽标、引用徽标、composer 加挂件），保持 UI 字体 + 中文字距自然。 */
 [data-dsh-part="chip"],
-[data-dsh-part="ref"],
-[data-dsh-part="tag-chip"],
-[data-dsh-part="tag-badge"] {
+[data-dsh-part="ref"] {
   font-family: var(--dsw-font-meta);
   font-size: var(--dsw-meta-size);
   font-weight: var(--dsw-meta-weight);
@@ -156,20 +180,14 @@ button[aria-disabled="true"],
   font-family: var(--dsw-font-meta);
 }
 
-[data-dsh-part="composer-chip"] {
-  text-transform: uppercase;
-  letter-spacing: var(--dsw-meta-tracking);
-}
+/* composer-chip 是 UI 标签：不强制 mono、不强制 letter-spacing、不强制 uppercase。
+   与「中文不强制拉字距」共同遵守：UI 文本走 UI 字体，由宿主令牌决定字号/字重。 */
 
-/* ⑩ 中文不加宽字距、不大写 */
-:lang(zh) [data-dsh-part="composer-chip"],
-:lang(zh) [data-dsh-part="chip"],
-:lang(zh) [data-dsh-part="ref"],
-:lang(zh) [data-dsh-part="tag-chip"],
-:lang(zh) [data-dsh-part="tag-badge"] {
-  letter-spacing: 0;
-  text-transform: none;
-}
+/* ⑩ 中文不加宽字距、不大写
+   上一版对 chip / ref / tag-chip / tag-badge / composer-chip 强制 letter-spacing + uppercase，
+   已被 ⑤ / ⑨ 删除（plan §0.3「中文不强制拉字距」 + §7.1 UX-14「普通 meta 用 UI 字体」），
+   故本节空挂。真 chip（[data-dsh-part="chip"|"ref"]）保持等宽是合理设计，标签字符
+   几乎不出现中文，不在此豁免之列。 */
 
 /* ⑪ reduced-motion：0.01ms 而不是 none —— 宿主靠 transitionend 摘 data-animating，none 不触发它 */
 @media (prefers-reduced-motion: reduce) {
@@ -270,14 +288,17 @@ body > div[role="menu"][aria-busy="true"] button[role="menuitemradio"]:disabled 
   }
 }
 
-/* ⑬ 输入区顶栏：视图页签隐去 */
-[data-slot="conversation.session.header"] > [data-conversation-tabs] {
+/* ⑬ 输入区顶栏：视图页签隐去 —— **受「出口就绪」门控**（T06 / UX-08）。
+   body[data-codex-ui-te-ready] 由 trajectory-exit.js 只在「能可靠找回对话页签」时盖上：
+   认不出（未知语言 / 标定失败 / DOM 漂移 / 模块压根没装上）就不盖，页签保持可见。
+   宁可多一条页签，也不能让用户进了轨迹出不来。 */
+body[data-codex-ui-te-ready] [data-slot="conversation.session.header"] > [data-conversation-tabs] {
   display: none;
 }
 
-/* 页签 display:none 后仍在树里，宿主 :has() 判定的 76px 空带还在 —— 按同一语义收掉。
+/* 页签 display:none 后仍在树里，宿主 :has() 判定的 76px 空带还在 —— 按同一语义收掉，同样受门控。
    必须带 :has([data-conversation-tabs])：hero 态页签根本不渲染，宿主的 min-height:0 才是对的。 */
-header:has([data-conversation-header-leading]):has([data-conversation-tabs]) {
+body[data-codex-ui-te-ready] header:has([data-conversation-header-leading]):has([data-conversation-tabs]) {
   min-height: 0;
   padding-bottom: 10px;
 }

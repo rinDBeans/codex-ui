@@ -264,7 +264,7 @@ if (labels.length === 0) {
   console.error('     这不是「没有异常」，是「什么都没测」：宿主一定会注册设置项，不会存在 0 项的合法场景。');
   console.error('     排查：设置模态是否打开（button[aria-label="设置"]）、'
     + '面板锚点 [data-shortcut-modal="settings"] / [data-dsh-surface="settings"] 是否命中、'
-    + 'src/settings-modal.js 是否打出了 [codex-ui] 警告。');
+    + 'src/client/settings-modal.js 是否打出了 [codex-ui] 警告。');
   ws.close(); child.kill();
   process.exit(1);
 }

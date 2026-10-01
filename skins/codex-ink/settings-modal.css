@@ -9,7 +9,7 @@
 
    作用域
      形态类规则全部挂在 html[data-codex-ui] 下的 [data-cx-sm-panel] 之下；
-     该属性是**本插件自有锚点**：src/settings-modal.js 检测到设置面板
+     该属性是**本插件自有锚点**：src/client/settings-modal.js 检测到设置面板
      （宿主锚点 data-shortcut-modal="settings"，兼容适配器的 data-dsh-surface 兜底）
      后盖印，面板不在就不盖 —— 锚点改名只需改 JS 一个函数。
      组件类（.cx-sm-*）只作用于 JS 注入的节点，注入节点带
@@ -503,7 +503,7 @@ html[data-codex-ui] div[data-cx-sm-panel] [data-slot="settings.action"] button:h
    data-slot 嵌在 span 里，用 :has 取按钮本身（不碰哈希类名）。
 
    为什么 display:none 是安全的：宿主自己的 Escape 关闭路径不受影响；
-   src/settings-modal.js 的 requestClose() 先用 Escape，兜底才 button.click()
+   src/client/settings-modal.js 的 requestClose() 先用 Escape，兜底才 button.click()
    —— 而 display:none 的元素 .click() 仍会触发宿主的 React onClick
    （display:none 只影响布局与命中测试，不阻止程序化派发）。那条兜底因此照旧可用。 */
 html[data-codex-ui] div[data-cx-sm-panel] button:has([data-slot="settings.close"]) {

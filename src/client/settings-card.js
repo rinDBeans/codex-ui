@@ -3,7 +3,7 @@
  * 改一下即写、没有保存按钮；文本框回车或失焦提交，写后回读确认落地；已覆盖的行显示徽标与「重置」。
  * 下面三行颜色编辑的是**当前生效的那一套**（theme.getTheme().active.colorScheme）。
  */
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { cloneElement, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { Button, SegmentedControl, Switch, Tag } from '@deepseek-ai/dsh-client-ui-primitives';
 import { isEnglish } from './host.js';
@@ -34,8 +34,13 @@ const COPY_ZH = {
   contrastDesc: '按 Codex 默认档位归一：45（亮）/ 60（暗）即原样',
   overridden: '已覆盖',
   reset: '重置',
+  /* 重置按钮带字段名：多个「重置」同名时读屏分不清点的是哪一个（UX-16）。 */
+  resetOf: (name) => '重置' + name,
+  invalidHex: '不是一个合法色值：写成 #RGB / #RRGGBB / #RRGGBBAA。',
+  invalidStack: '字体栈不能为空，写成逗号分隔的族名，例如 Segoe UI, sans-serif。',
   follow: '跟随皮肤',
   failed: '保存没生效，请重试。',
+  themeTimeout: '主题切换没等到宿主确认，已按当前生效的主题回退；分段控件不再停在未生效的那一档。',
   unavailable: '这个 dsh 没有把 codex-ui 的配置开放给本页：条目可能在本 profile 里被停用，或连接把偏好留在页面进程内。',
   readOnly: '设置文档是只读的，改动无法保存。',
 };
@@ -64,8 +69,12 @@ const COPY_EN = {
   contrastDesc: 'Normalised to the Codex defaults: 45 (light) / 60 (dark) is unchanged',
   overridden: 'Overridden',
   reset: 'Reset',
+  resetOf: (name) => 'Reset ' + name,
+  invalidHex: 'Not a valid colour value: use #RGB / #RRGGBB / #RRGGBBAA.',
+  invalidStack: 'The font stack cannot be empty; use comma-separated family names, e.g. Segoe UI, sans-serif.',
   follow: 'Follow skin',
   failed: 'The save did not take effect. Please try again.',
+  themeTimeout: 'The theme switch was not confirmed by the host, so it was rolled back to the theme actually in effect; the segments no longer sit on the value that never took.',
   unavailable: 'This dsh does not expose codex-ui configuration to this page: the entry may be disabled in this profile, or the connection keeps preferences inside the page process.',
   readOnly: 'The settings document is read-only, so changes cannot be saved.',
 };
@@ -94,10 +103,14 @@ export function SettingsCard({ scope, theme, themeForm, watchTheme, previewTheme
   const preference = themeSnapshot.preference;
   const variant = themeSnapshot.active?.colorScheme === 'dark' ? 'dark' : 'light';
   const [drafts, setDrafts] = useState({});
+  /* 字段级错误：非法输入不再静默丢弃，而是挂在对应行上并关联给控件（UX-16）。 */
+  const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   /* 分段控件先显示用户点的那个值：写文档是异步的，不暂存的话控件会滞后一拍。 */
   const [pendingTheme, setPendingTheme] = useState(null);
+  /* 主题事务超时/未被接受：分段控件必须回退，并且要有用户能读到的反馈。 */
+  const [themeTimedOut, setThemeTimedOut] = useState(false);
   useEffect(() => {
     if (pendingTheme !== null && pendingTheme === preference) setPendingTheme(null);
   }, [pendingTheme, preference]);
@@ -111,14 +124,22 @@ export function SettingsCard({ scope, theme, themeForm, watchTheme, previewTheme
    */
   const switchTheme = useCallback(async (id) => {
     if (id !== 'light' && id !== 'dark' && id !== 'system') return;
+    setThemeTimedOut(false);
     setPendingTheme(id);
-    previewTheme(id);
+    /* 预览结束时才决定分段控件的去留：confirmed=false（超时/卸载回滚）就必须清 pending，
+       否则页面已回亮色、分段仍选深色 —— 这是已复现的脱节。 */
+    previewTheme(id, (confirmed) => {
+      if (confirmed) return;
+      setPendingTheme(null);
+      setThemeTimedOut(true);
+    });
     try {
       if ((await themeForm.set('preference', id)) !== false) return;
     } catch (error) {
       console.warn('[codex-ui] 直接写主题偏好失败，退回服务入口：', error);
     }
     setPendingTheme(null);
+    setThemeTimedOut(true);
     try {
       theme.setTheme(id);
     } catch (error) {
@@ -142,15 +163,27 @@ export function SettingsCard({ scope, theme, themeForm, watchTheme, previewTheme
     () => scope.set(field, next),
     (accepted) => accepted !== false && fieldValue(scope.getSnapshot(), field) === next,
   ), [scope, persist]);
-  const clear = useCallback((field) => persist(
-    () => scope.unset(field),
-    () => !hasUserField(scope.getSnapshot(), field),
-  ), [scope, persist]);
+  const clear = useCallback((field) => {
+    /* 撤草稿必须与撤存储值同时做：草稿是 shown 的第一优先级（见 contrastRow），
+       只 unset 存储值的话，重置后滑杆/读数仍显示旧草稿。 */
+    setDrafts((prev) => { const next = { ...prev }; delete next[field]; return next; });
+    setErrors((prev) => { if (!Object.hasOwn(prev, field)) return prev; const next = { ...prev }; delete next[field]; return next; });
+    return persist(
+      () => scope.unset(field),
+      () => !hasUserField(scope.getSnapshot(), field),
+    );
+  }, [scope, persist]);
 
   /** 提交一个文本/色值草稿：空串写的是清除。 */
   const commitText = useCallback(async (field, draft, validate) => {
     const text = String(draft).trim();
-    if (text !== '' && validate(text) === false) return;
+    /* 非法值不再静默 return：挂一条字段级错误，用户才知道为什么不保存。 */
+    if (text !== '' && validate(text) === false) {
+      const message = validate === isFontStack ? copy.invalidStack : copy.invalidHex;
+      setErrors((prev) => (prev[field] === message ? prev : { ...prev, [field]: message }));
+      return;
+    }
+    setErrors((prev) => { if (!Object.hasOwn(prev, field)) return prev; const next = { ...prev }; delete next[field]; return next; });
     setDrafts((prev) => { const next = { ...prev }; delete next[field]; return next; });
     if (text === '') { await clear(field); return; }
     await write(field, text);
@@ -163,9 +196,18 @@ export function SettingsCard({ scope, theme, themeForm, watchTheme, previewTheme
     return jsx('p', { className: 'cx-note', role: 'status', children: copy.unavailable });
   }
 
-  /** 一行：标签 + 说明 + 覆盖徽标 + 控件。 */
+  /** 一行：标签 + 说明 + 覆盖徽标 + 控件；说明与错误用稳定 id 关联到控件。 */
   const row = (key, label, desc, control, field) => {
     const overridden = field !== undefined && hasUserField(snapshot, field);
+    const error = field === undefined ? undefined : errors[field];
+    /* 稳定 id 的关联链：控件的 aria-describedby → 说明（出错时再加错误）。
+       没有它，读屏只念 aria-label，用户不知道「为什么不保存」（UX-16）。 */
+    const descId = 'codex-ui-' + key + '-desc';
+    const errId = 'codex-ui-' + key + '-err';
+    const describedBy = error === undefined ? descId : descId + ' ' + errId;
+    const wired = (node) => (node === null || node === undefined || typeof node !== 'object'
+      ? node
+      : cloneElement(node, { 'aria-describedby': describedBy }));
     return jsxs('div', {
       className: 'cx-row',
       children: [
@@ -179,14 +221,15 @@ export function SettingsCard({ scope, theme, themeForm, watchTheme, previewTheme
                 overridden ? jsx(Tag, { tone: 'outline', children: copy.overridden }) : null,
               ],
             }, 'label'),
-            desc === null ? null : jsx('div', { className: 'cx-row__desc', children: desc }),
+            desc === null ? null : jsx('div', { className: 'cx-row__desc', id: descId, children: desc }),
+            error === undefined ? null : jsx('div', { className: 'cx-error', id: errId, role: 'status', children: error }),
           ],
         }, 'text'),
         jsxs('div', {
           className: 'cx-row__control',
           children: [
-            control,
-            overridden ? jsx(Button, { variant: 'ghost', size: 'sm', disabled, onClick: () => clear(field), children: copy.reset }) : null,
+            Array.isArray(control) ? control.map(wired) : wired(control),
+            overridden ? jsx(Button, { variant: 'ghost', size: 'sm', disabled, onClick: () => clear(field), children: copy.resetOf(label) }) : null,
           ],
         }, 'control'),
       ],
@@ -248,7 +291,14 @@ export function SettingsCard({ scope, theme, themeForm, watchTheme, previewTheme
   const contrastRow = () => {
     const field = fieldOf('contrast');
     const shown = draftOf(field) ?? fieldValue(snapshot, field) ?? DEFAULT_CONTRAST[variant];
-    const commit = () => { if (draftOf(field) !== undefined) write(field, draftOf(field)); };
+    /* 提交后必须撤草稿，否则 shown 永远取草稿，保存值与重置都改不动读数；
+       顺序与 commitText 的「先撤草稿再写」一致。 */
+    const commit = () => {
+      const next = draftOf(field);
+      if (next === undefined) return;
+      setDrafts((prev) => { const copy = { ...prev }; delete copy[field]; return copy; });
+      write(field, next);
+    };
     return row('contrast', copy.contrast, copy.contrastDesc, [
       jsx('input', {
         key: 'range',
@@ -293,6 +343,7 @@ export function SettingsCard({ scope, theme, themeForm, watchTheme, previewTheme
         ],
         onChange: switchTheme,
       })),
+      themeTimedOut ? jsx('p', { className: 'cx-note', role: 'status', children: copy.themeTimeout }) : null,
       colorRow('accent', copy.accent, copy.accentDesc),
       colorRow('surface', copy.surface, copy.surfaceDesc),
       colorRow('ink', copy.ink, copy.inkDesc),

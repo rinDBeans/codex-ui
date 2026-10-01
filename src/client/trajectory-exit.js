@@ -6,9 +6,12 @@
  * 而「轨迹」正是那条页签条里的一格。入口没被删 —— 工具卡展开后的 Inspect 走
  * `openView('trajectory', callId)` —— 出口却只剩页签条，于是进了轨迹就出不来。
  *
- * 本模块不动页签条（那是与参考图的对齐面），只在**轨迹视图显示时**浮一个「← 对话」；
- * 点击就是**点那一格页签本身** —— 与用户手点走同一条 `selectView` 回调，不绕宿主内部 API、
- * 也不去猜宿主的状态。页签条哪天重新可见，本模块自动让位（见 `sync` 的第一道判断）。
+ * 本模块不动页签条本身，只在**轨迹视图显示时**浮一个「← 对话」；点击就是**点那一格页签本身**
+ * —— 与用户手点走同一条 `selectView` 回调，不绕宿主内部 API、也不去猜宿主的状态。
+ *
+ * **页签条的隐去（⑬）由本模块门控**（T06 / UX-08）：只有在「能可靠找回对话页签」时才盖
+ * `body[data-codex-ui-te-ready]`，patches.css 的隐去规则挂在它下面。认不出就**不盖**，
+ * 页签保持可见 —— 宁可多一条页签，也不能让用户进了轨迹出不来。
  *
  * 三处宿主依赖，任一不符就整体不挂（只 warn，不抛、不连累皮肤）：
  *   · 页签条 `[data-conversation-tabs] [role="tab"]`（ui-conversation 渲染，皮肤只负责隐藏）
@@ -22,7 +25,7 @@
  * 几何锚点取 `[data-slot="conversation.view"]` 的**父元素**：那个 slot 容器是 `display: contents`，
  * 自己的 rect 恒为 0。
  */
-import { PLUGIN_ID } from './constants.js';
+import { PLUGIN_ID, TE_READY_ATTR } from './constants.js';
 
 /** 宿主页签条：皮肤只把它 display:none，节点与 React 回调都还在。 */
 const TABLIST = '[data-conversation-tabs]';
@@ -68,18 +71,27 @@ export function installTrajectoryExit(ctx) {
 
   const schedule = () => { if (frame === 0) frame = requestAnimationFrame(sync); };
 
+  /** 出口就绪标记：CSS 的页签隐去规则挂在它下面。 */
+  const setReady = (on) => {
+    const body = doc.body;
+    if (body === null) return;
+    if (on) body.setAttribute(TE_READY_ATTR, '');
+    else body.removeAttribute(TE_READY_ATTR);
+  };
+
   const sync = () => {
     frame = 0;
     const root = viewRoot();
-    if (root === null) { drop(); return; }
-    /* 页签条自己能看见时，用户本来就有出口 —— 本模块让位（⑬ 哪天回退，这里自动失效）。 */
-    const bar = doc.querySelector(TABLIST);
-    if (bar !== null && bar.offsetParent !== null) { drop(); return; }
+    if (root === null) { setReady(false); drop(); return; }
     /* 标定：视图区正在渲染对话时，被选中的那一格就是对话页签。 */
     if (root.querySelector(CHAT_MARK) !== null) calibrated = selectedTab();
-    if (root.querySelector(TRAJECTORY_MARK) === null) { drop(); return; }
+    /* 「能不能可靠找回对话页签」才是允许隐去页签条的唯一前提。
+       认不出（未知语言 / 标定失败 / DOM 漂移）就不盖就绪标记 —— 页签保持可见，
+       用户永远有出口；宁可多一条页签，也不能让人进了轨迹出不来。 */
     const target = chatTab();
+    setReady(target !== null);
     if (target === null) { drop(); return; }
+    if (root.querySelector(TRAJECTORY_MARK) === null) { drop(); return; }
 
     if (button === null) {
       button = doc.createElement('button');
@@ -123,6 +135,7 @@ export function installTrajectoryExit(ctx) {
     globalThis.removeEventListener?.('resize', onResize);
     resize?.disconnect();
     if (frame !== 0) cancelAnimationFrame(frame);
+    setReady(false);   /* 卸载必须撤标记：否则页签会一直是被隐藏的状态 */
     drop();
   }, 'codex-ui: trajectory exit');
 }

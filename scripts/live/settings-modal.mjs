@@ -3,7 +3,7 @@
  * settings-modal-verify.mjs — 设置模态框「结构层 + 视觉层」的真 GUI 验收。
  *
  * 覆盖两件交付物的集成结果：
- *   · src/settings-modal.js                结构层（返回按钮 / 搜索框 / 分组标题 / 排序 / 过滤）
+ *   · src/client/settings-modal.js         结构层（返回按钮 / 搜索框 / 分组标题 / 排序 / 过滤）
  *   · skins/codex-ink/settings-modal.css   视觉层（注入节点的样式是否真的命中）
  *
  * 为什么必须真 GUI：分组与过滤改的是宿主 navList 的真实子节点，而宿主的 React 重渲染行为
@@ -50,7 +50,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 if (!TOKEN_URL) { console.error('缺少 --url "http://127.0.0.1:<port>/?token=..."'); process.exit(2); }
 
 /* ── 契约快照：分组映射表 ─────────────────────────────────────────────────
-   这是 src/settings-modal.js 里 GROUPS 的期望值。下面有一道「与源文件对账」的前置检查：
+   这是 src/client/settings-modal.js 里 GROUPS 的期望值。下面有一道「与源文件对账」的前置检查：
    源文件改了映射而这里没跟着改，脚本会**先报错**而不是拿旧快照去测新实现。 */
 const EXPECT_GROUPS = [
   { id: 'personal', label: '个人', items: ['账号与余额', '通用设置', '皮肤', '宠物', '使用统计'] },
@@ -63,16 +63,16 @@ const EXPECT_GROUPS = [
 const OPTIONAL_ITEMS = new Set(['账号与余额', '皮肤']);
 
 {
-  const src = fs.readFileSync(join(WB, 'src', 'settings-modal.js'), 'utf8');
+  const src = fs.readFileSync(join(WB, 'src', 'client', 'settings-modal.js'), 'utf8');
   const block = /const GROUPS = \[([\s\S]*?)\n\];/.exec(src);
   if (block === null) {
-    console.error('前置检查失败：src/settings-modal.js 里找不到 GROUPS 字面量，契约快照无法对账');
+    console.error('前置检查失败：src/client/settings-modal.js 里找不到 GROUPS 字面量，契约快照无法对账');
     process.exit(2);
   }
   const actual = [...block[1].matchAll(/\{ id: '([a-z]+)', label: '([^']+)', items: \[([^\]]*)\] \}/g)]
     .map((m) => ({ id: m[1], label: m[2], items: m[3].split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean) }));
   if (JSON.stringify(actual) !== JSON.stringify(EXPECT_GROUPS)) {
-    console.error('前置检查失败：脚本里的 EXPECT_GROUPS 与 src/settings-modal.js 的 GROUPS 已经不一致。');
+    console.error('前置检查失败：脚本里的 EXPECT_GROUPS 与 src/client/settings-modal.js 的 GROUPS 已经不一致。');
     console.error('  源文件：' + JSON.stringify(actual));
     console.error('  脚本内：' + JSON.stringify(EXPECT_GROUPS));
     console.error('  改映射是行为变更 —— 请同步更新本脚本顶部的 EXPECT_GROUPS。');
@@ -153,7 +153,7 @@ await sleep(11000);
    selector 一律走稳定锚点 —— **宿主优先**：data-shortcut-modal="settings"（宿主自己盖在面板上的
    属性）、data-slot / aria-current / role / tag / 位置索引；适配器的 data-dsh-surface="settings"
    只作兜底（第三方 skin-center 补打，契约自称非永久公共契约，不是唯一锚点、也不是首选）。
-   面板定位的**唯一权威来源**是 src/settings-modal.js 的 PANEL_SELECTOR，本文件不重复实现它，
+   面板定位的**唯一权威来源**是 src/client/settings-modal.js 的 PANEL_SELECTOR，本文件不重复实现它，
    只断言它盖出来的自有锚点 [data-cx-sm-panel] 确实在。
    不碰宿主哈希类名（CSS-Modules，每次构建都变）。 */
 
@@ -382,7 +382,7 @@ function cxsInstall() {
   };
   /**
    * 面板的**自有锚点**盖印状态（本轮锚点迁移的集成证据）。
-   * data-cx-sm-panel 是 src/settings-modal.js 的 findPanel() 找到面板后盖的，
+   * data-cx-sm-panel 是 src/client/settings-modal.js 的 findPanel() 找到面板后盖的，
    * 视觉层全部形态规则都挂在它下面 —— 它没盖上的话，整份 settings-modal.css 不命中任何元素。
    */
   const panelStamp = () => {
@@ -771,7 +771,7 @@ console.log('\n── 3d 自有锚点盖印 · 卡着色令牌路径 ──');
 /* (a) 面板在插件注入后带上自有锚点 data-cx-sm-panel。
    本轮把面板锚点从「仅适配器的 data-dsh-surface="settings"」迁到
    「宿主 data-shortcut-modal="settings" 优先、适配器兜底」，定位到面板后由
-   src/settings-modal.js 的 findPanel() 盖上自有锚点；settings-modal.css 的全部形态规则
+   src/client/settings-modal.js 的 findPanel() 盖上自有锚点；settings-modal.css 的全部形态规则
    都改挂它 —— 它没盖上，整份视觉层就不命中任何元素（这正是本轮迁移的风险点）。
    一条断言同时钉三件事：盖了、盖在真正的面板节点上（与宿主锚点是同一个节点）、没盖重。 */
 const stamped = await evaluate('window.__cxs.panelStamp()');
@@ -1058,6 +1058,29 @@ if (backBox !== null) {
   const orphansAfter = await evaluate('window.__cxs.orphanCount()');
   check('关闭后不留注入孤儿', orphansAfter === 0, 'orphans=' + orphansAfter);
 }
+
+/* ── 9a. Escape 被拦截时的兜底关闭（UX-01 / A02 后半）────────────────────
+   修复前的分支写反：`if (findPanel() !== null) return;` 注释却写「Escape 生效了」，
+   于是「Escape 没关掉 → 点宿主关闭按钮」这条兜底**永远不执行**。
+   这里在 window 捕获阶段吞掉 Escape（模拟被宿主/浏览器拦截），再点返回按钮：
+   修好了才关得掉；条件写反时面板会留在原地。 */
+console.log('\n── 9a Escape 被拦截时的兜底 ──');
+await openSettings();
+await sleep(1200);
+await evaluate("window.__cxsBlockEscape = (e) => { if (e.key === 'Escape') e.stopImmediatePropagation(); };"
+  + " window.addEventListener('keydown', window.__cxsBlockEscape, true);");
+const backBlocked = await evaluate("(() => { const el = document.querySelector(\"[data-cx-sm-part='back']\");"
+  + " if (el === null) return null; const r = el.getBoundingClientRect();"
+  + " return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()");
+check('拦截态下仍能找到返回按钮', backBlocked !== null, JSON.stringify(backBlocked));
+if (backBlocked !== null) {
+  await click(backBlocked.x, backBlocked.y);
+  await sleep(1800);
+  const afterBlocked = await evaluate('window.__cxs.panelCount()');
+  check('Escape 被拦截时返回按钮仍能关掉设置（兜底路径活着）', afterBlocked === 0, 'panel count=' + afterBlocked);
+}
+await evaluate("window.removeEventListener('keydown', window.__cxsBlockEscape, true)");
+
 
 /* 收尾：恢复干净现场，保证脚本幂等可复跑。 */
 await openSettings();

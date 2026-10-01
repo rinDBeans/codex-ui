@@ -305,7 +305,14 @@ h4{margin:0 0 10px 24px;font:600 12px/18px ui-monospace,Consolas,monospace;color
   t.check('会话名仍在', hdr.header.title === true);
   t.check('预设徽标可见（顶栏两格已放开）', hdr.header.presetBadge === true);
   t.check('右侧工具条目可见（顶栏两格已放开）', hdr.header.utilityItem === true);
-  t.check('页签仍隐去', hdr.header.tabs === false);
+  /* ⑬ 页签隐去受「出口就绪」门控（T06 / UX-08）：trajectory-exit.js 只在能可靠找回
+     对话页签时才盖 data-codex-ui-te-ready。没有它就**必须**看得见页签 —— 这是
+     「进了轨迹出不来」的兜底；有它才隐去，⑬ 的视觉不变。两段都要测。 */
+  t.check('出口未就绪时页签可见（不会无路可退）', hdr.header.tabs === true);
+  await page.evaluate(() => document.body.setAttribute('data-codex-ui-te-ready', ''));
+  const hdrReady = await page.evaluate(probeHero);
+  t.check('出口就绪时页签隐去（⑬ 视觉保持）', hdrReady.header.tabs === false);
+  await page.evaluate(() => document.body.removeAttribute('data-codex-ui-te-ready'));
   t.check('右上角按钮仍在', hdr.header.corner === true);
   /* 期望值不硬编码 rgb：令牌在重锚后是 rgba 字面量，浏览器算出来的徽标色是它
      在顶栏底色上的合成结果。临时元素走一遍 var() 让浏览器自己算，再与徽标比。 */

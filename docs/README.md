@@ -16,6 +16,8 @@
 
 | 文档 | 语言 | 状态 | 内容 |
 |---|---|---|---|
+| [codex-ui-ux-audit-plan.zh-CN.md](codex-ui-ux-audit-plan.zh-CN.md) | 中文 | **现行执行方案 · 2026-09-30 · 已按用户修订** | 当前模型选择器与推理强度胶囊完整保留；旧DSH截图仅作历史，先采新版真实GUI再决定改造项。包含源码发现、能力边界、任务依赖、回归保护、验收和执行指令。 |
+| [codex-ui-ux-audit-t00-baseline.zh-CN.md](codex-ui-ux-audit-t00-baseline.zh-CN.md) | 中文 | **T00 交付 · 2026-09-30 · 真实宿主实测** | 当前真实基线：宿主版本、profile 组合、被版本门禁跳过的 4 个 bundle、两个 live 脚本的实测结果，以及 UX-01～UX-16 的逐项判定（已满足/确认问题/待核实）。 |
 | [codex-app-ui-inventory.zh-CN.md](codex-app-ui-inventory.zh-CN.md) | 中文 | 参考 · 仍有效 | Codex 桌面应用 UI 层的功能清单（只读调查）：界面组件、交互功能、TUI 侧独有项，以及「给 DSH 插件加哪些」的筛选建议。§5 给了可复跑的三条正则。 |
 | [next-components.zh-CN.md](next-components.zh-CN.md) | 中文 | **部分已消费** | 还没做的组件、功能与优化对账稿：令牌级缺口、组件级缺口（50 个客户端包里 19–28 个零锚点）、功能候选、工程优化、够不着的边界，以及建议批次。 |
 | [plan-model-picker.zh-CN.md](plan-model-picker.zh-CN.md) | 中文 | **历史 · 已执行（0.6.0）** | 把模型选择器做成真组件的原始计划（对齐 dsh-claude-style 的夺席位 + 宿主唯一真源做法）。实现即功能表里的 ⑳。 |

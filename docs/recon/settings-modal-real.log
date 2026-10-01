@@ -1,0 +1,163 @@
+
+── 1 侧栏骨架 ──
+  宿主项 6 个，注入件 11 个
+ok   返回按钮存在、文案与无障碍名正确  text=←返回应用 aria=返回应用
+ok   顺序：返回在最上 → 搜索框 → 宿主标题 → 列表  back=0 search=1 title=2
+ok   搜索框占位符正确  placeholder=搜索设置...
+
+── 2 分组与项序 ──
+node : FAIL 分组标题按 个人/集成/编码/已归档 顺序出现
+所在位置 行:1 字符: 129
++ ... ew($false); node scripts/live/settings-modal.mjs --url "http://127.0. ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL 分组标题按 个人/集成/编码/已归档 顺序出现:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+     got  = ["个人","集成","编码","其他"]
+     want = ["个人","集成","编码","已归档"]
+     第 2 项起不一致：got=[["integrations","集成"],["integrations","内置插件"],["integrations","订阅服务"]] want=[["personal","宠物"],["pe
+rsonal","使用统计"],["integrations","集成"]]
+FAIL 可见视觉流与分组映射表逐项一致
+     got  = [["personal","个人"],["personal","通用设置"],["integrations","集成"],["integrations","内置插件"],["integrations","订阅服务"
+],["coding","编码"],["coding","模型"],["coding","Agent 预设"],["other","其他"],["other","Ivory 主题"]]
+     want = [["personal","个人"],["personal","通用设置"],["personal","宠物"],["personal","使用统计"],["integrations","集成"],["integr
+ations","内置插件"],["integrations","Web 插件"],["integrations","订阅服务"],["integrations","记忆系统"],["integrations","创意工坊"],["cod
+ing","编码"],["coding","模型"],["coding","Agent 预设"],["coding","LLM Verifier"],["archive","已归档"],["archive","已归档会话"]]
+FAIL 「账号与余额」缺位时，个人组其余项正常、组标题仍在
+  （本实例「账号与余额」缺位；两种都算通过，验的是组内其余项不受影响）
+     hasAccount=false 个人组=["通用设置"]
+
+── 3 视觉层命中 ──
+ok   返回按钮有样式命中（flex + 13px + pointer）  {"present":true,"display":"flex","fontSize":"13px","cursor":"pointer","color":"rgb(82, 81, 78)"}
+ok   分组标题有样式命中（12px 小字）  {"present":true,"display":"block","fontSize":"12px","color":"rgb(111, 109, 104)"}
+ok   搜索框有样式命中（flex + 32px 高）  {"present":true,"display":"flex","height":"32px","borderTopLeftRadius":"999px","paddingLeft":"14px"}
+ok   搜索输入框有样式命中（13px）  {"present":true,"fontSize":"13px","height":"32px"}
+ok   搜索框是全圆角胶囊（计算半径 999px，非 10px 的方形井档）  {"radius":"999px","height":"32px"}
+ok   胶囊两侧内衬加宽（14px，图标与文字不贴弧）  paddingLeft=14px
+
+── 3b 页头大标题 ──
+ok   页头存在且唯一（未重复注入）  {"present":true,"headCount":1,"titleCount":1,"text":"通用设置","fontSize":"20px","fontWeight":"600","display":"block","parentIsDirectChildOfContent":true,"parentHasActionSeat":true,"firstInRow":true,"rowIsFlex":true,"headClass":"cx-sm-pagehead","titleClass":"cx-sm-title","tag":"DIV"}
+ok   页头挂在内容列的直接子节点（header 行）上  {"present":true,"headCount":1,"titleCount":1,"text":"通用设置","fontSize":"20px","fontWeight":"600","display":"block","parentIsDirectChildOfContent":true,"parentHasActionSeat":true,"firstInRow":true,"rowIsFlex":true,"headClass":"cx-sm-pagehead","titleClass":"cx-sm-title","tag":"DIV"}
+ok   页头在最左、与右上角操作座位同一行（Codex 的「大标题 + 页级操作」形态）  firstInRow=true hasActionSeat=true
+ok   标题文本 = 当前激活项的 label  title="通用设置" active="通用设置"
+ok   标题真的有视觉（字号明显大于正文 13px）  fontSize=20px weight=600
+ok   页头类名与视觉层契约一致（.cx-sm-pagehead / .cx-sm-title，视觉层才有命中）  cx-sm-pagehead / cx-sm-title
+
+── 3c 打磨轮形态（桌面标题栏 · 居中 · 层次）──
+ok   模拟桌面标题栏时面板 padding-top = 40px（内容整体下移，不与标题栏碰撞）  {"paddingTop":"40px","height":960}
+ok   标题栏让位只加内边距、面板仍是整屏高（不缩高、不露底）  {"paddingTop":"40px","height":960}
+ok   内容容器收窄到 760px 且水平居中（左右留白大致相等）  {"present":true,"rootWidth":760,"contentWidth":1204,"left":222,"right":222,"maxWidth":"760px"}
+ok   内容容器的 max-width 真的生效（不是打在 display:contents 包装上）  {"present":true,"rootWidth":760,"contentWidth":1204,"left":222,"right":222,"maxWidth":"760px"}
+ok   背板不透明：无 backdrop-filter，且底色 alpha = 1（颜色钉死，不吃环境色）  filter=none / 背板=rgb(246, 246, 246)
+ok   内容列是 flush 平铺：无圆角、无描边、无 gutter  radius=0px / border=0px none / margin=0px
+ok   连续行合并成一张卡：首行上圆角 + 末行下圆角 + 中间行无圆角  {"panelBg":"rgb(246, 246, 246)","panelFilter":"none","contentBg":"rgb(252, 252, 251)","contentRadius":"0px","contentBorder":"0px none","contentMargin":"0px","rowCount":12,"firstRadius":"12px 12px 0px 0px","lastRadius":"0px 0px 12px 12px","middleRadius":"0px","rowBg":"rgb(252, 252, 251)","rowBorderTopColor":"rgb(246, 246, 246)","rowBorderLeftWidth":"1px","rowBorderTopWidth":"1px","midBorderLeftWidth":"0px","lastBorderLeftWidth":"1px"}
+ok   内容列 = bg-base 平铺（浅 #ffffff / 深 #111111）  contentBg=rgb(252, 252, 251) / --dsw-alias-bg-base=#fcfcfb
+ok   浅色内容列与背板分色（内容白 ≠ 侧栏色）  contentBg=rgb(252, 252, 251) / 背板=rgb(246, 246, 246)
+ok   浅色卡边 = bg-sidebar 细边，且左右边齐全  卡边=rgb(246, 246, 246) / --dsw-alias-bg-sidebar=#f6f6f6 / 首行左=1px 上=1px / 末行左=1px
+ok   卡内中间行不画左右边（发丝线不断口）  中间行左边宽=0px
+ok   背板与主界面侧栏同色（设置页左栏 = 主界面侧栏面）  左栏计算色=rgb(246, 246, 246) / --dsw-alias-bg-sidebar=#f6f6f6
+ok   背板已不是 layer-3（没有退回旧令牌）  左栏计算色=rgb(246, 246, 246) / --dsw-alias-bg-layer-3=#ffffff
+
+── 3d 自有锚点盖印 · 卡着色令牌路径 ──
+ok   面板被盖印自有锚点 data-cx-sm-panel（锚点迁移的集成证据）  {"count":1,"attr":"","hostCount":1,"sameNode":true,"shortcutModal":"settings","surface":null}
+FAIL 模型页未选中卡的背景 = var(--dsw-alias-bg-layer-1) 的计算值（令牌路径活着）
+     卡="rgb(255, 255, 255)" / layer-1=rgb(252, 252, 251) / 卡数 可见/总=6/6
+ok   Agent 预设页：选中卡背景 ≠ 未选中卡背景（选中态未被令牌路径抹平）  未选中="rgb(255, 255, 255)" / 选中="rgb(249, 249, 247)" / 卡数 可见/总=15/15
+ok   模型页与 Agent 预设页的未选中卡同为 layer-1 一档（两页白卡一致）  模型="rgb(255, 255, 255)" / Agent="rgb(255, 255, 255)"
+ok   右上角 ✕ 关闭按钮已隐藏（Codex 无此按钮，← 返回应用承担退出）  {"present":true,"display":"none","rectW":0}
+ok   切项后标题跟随更新  title="模型" active="模型" clicked="模型"
+ok   切项后页头仍唯一（没有叠加出第二个）  headCount=1
+ok   行标题恢复 14px 且为 label-primary（未被文字层级规则染灰压小）  {"primary":"rgb(11, 11, 11)","titles":[{"text":"权限","fs":"14px","color":"rgb(11, 11, 11)"},{"text":"语言","fs":"14px","color":"rgb(11, 11, 11)"},{"text":"字号大小","fs":"14px","color":"rgb(11, 11, 11)"}]}
+ok   行内说明为 12px 且压到 label-caption 档（与标题明显分层）  {"caption":"rgb(111, 109, 104)","descs":[{"text":"选择新会话的默认权限","fs":"12px","color":"rgb(111, 109, 104)"},{"text":"仅影响会话内容的字号","fs":"12px","color":"rgb(111, 109, 104)"},{"text":"仅影响界面与会话正文","fs":"12px","color":"rgb(111, 109, 104)"}]}
+ok   标题与说明确实是两个不同层级（不是同色同号）  {"title0":{"text":"权限","fs":"14px","color":"rgb(11, 11, 11)"},"desc0":{"text":"选择新会话的默认权限","fs":"12px","color":"rgb(111, 109, 104)"}}
+ok   控件区裸数字未被文字层级规则误伤（仍为 label-primary，不被压成 caption 灰）  [{"text":"14","fs":"14px","color":"rgb(11, 11, 11)"}]
+
+── 4 搜索过滤 ──
+ok   过滤命中精确：只剩「模型」
+ok   空分组标题被隐藏，只留命中的「编码」
+ok   过滤只改显隐，宿主节点一个不少  6 vs 6
+ok   被隐藏项确实不可见（computed display:none）  复现项=[]
+ok   无结果提示出现、且排在视觉流最后  [["empty","没有匹配的设置项"]]
+ok   无结果时所有宿主项都被隐藏  []
+ok   清空后全部恢复  仍隐藏=[]
+FAIL 清空后视觉流回到映射表序列
+     got  = [["personal","个人"],["personal","通用设置"],["integrations","集成"],["integrations","内置插件"],["integrations","订阅服务"
+],["coding","编码"],["coding","模型"],["coding","Agent 预设"],["other","其他"],["other","Ivory 主题"]]
+     want = [["personal","个人"],["personal","通用设置"],["personal","宠物"],["personal","使用统计"],["integrations","集成"],["integr
+ations","内置插件"],["integrations","Web 插件"],["integrations","订阅服务"],["integrations","记忆系统"],["integrations","创意工坊"],["cod
+ing","编码"],["coding","模型"],["coding","Agent 预设"],["coding","LLM Verifier"],["archive","已归档"],["archive","已归档会话"]]
+
+── 5 隐藏态耐久性（真实交互路径回归）──
+ok   找到用于构造场景的可见项  target=模型 active=通用设置
+ok   构造出故障前提：存在被隐藏项，且当前选中项就在其中  选中项=通用设置 被隐藏=["个人","通用设置","集成","内置插件","Agent 预设","其他","Ivory 主题","订阅服务","没有匹配的设置项"]
+ok   选中态搬家后，被隐藏项不因类名被抹掉而复现  复现项=[]
+ok   被隐藏项仍是「属性 + 计算样式」一致（display:none）  []
+
+── 6 切项 / 关闭重开 ──
+ok   切设置项后返回按钮与搜索框存活  back=0 search=1
+ok   切设置项后 4 个分组标题仍在  个人/编码/集成/其他
+ok   切设置项不产生重复注入节点  12 vs 12
+ok   切设置项后每个注入件仍全局唯一（无重复节点）  {"back":1,"search":1,"search-input":1,"group:personal":1,"group:coding":1,"group:integrations":1,"group:other":1,"empty":1,"pagehead":1,"pagehead-title":1}
+ok   Esc 关闭设置  panel count=0
+ok   关闭后注入节点随面板一起消失（不留孤儿）  orphans=0
+ok   重开后完整重放（返回 + 搜索 + 4 标题）  back=true search=1 headers=4
+ok   重放不叠加：每个注入件全局唯一  {"back":1,"search":1,"search-input":1,"group:personal":1,"group:coding":1,"group:integrations":1,"group:other":1,"pagehead":1,"pagehead-title":1}
+ok   重放后无残留空结果提示  []
+FAIL 重放后视觉流仍与映射表一致
+     got  = [["personal","个人"],["personal","通用设置"],["integrations","集成"],["integrations","内置插件"],["integrations","订阅服务"
+],["coding","编码"],["coding","模型"],["coding","Agent 预设"],["other","其他"],["other","Ivory 主题"]]
+     want = [["personal","个人"],["personal","通用设置"],["personal","宠物"],["personal","使用统计"],["integrations","集成"],["integr
+ations","内置插件"],["integrations","Web 插件"],["integrations","订阅服务"],["integrations","记忆系统"],["integrations","创意工坊"],["cod
+ing","编码"],["coding","模型"],["coding","Agent 预设"],["coding","LLM Verifier"],["archive","已归档"],["archive","已归档会话"]]
+ok   重开后页头完整重放且不重复（head/标题各 1 个）  {"present":true,"headCount":1,"titleCount":1,"text":"通用设置","fontSize":"20px","fontWeight":"600","display":"block","parentIsDirectChildOfContent":true,"parentHasActionSeat":true,"firstInRow":true,"rowIsFlex":true,"headClass":"cx-sm-pagehead","titleClass":"cx-sm-title","tag":"DIV"}
+ok   重开后标题回到当前激活项  title="通用设置" active="通用设置"
+
+── 7 未知项兜底 ──
+ok   能模拟第三方插件插入一个新设置项  injected=true
+ok   未知项落「其他」组  {"i":10,"tag":"BUTTON","part":null,"group":"other","text":"第三方测试项","order":4002,"injected":false,"hidden":false,"display":"flex","hasHiddenAttr":false,"hasHiddenClass":false}
+ok   「其他」组标题存在  group:personal/group:coding/group:integrations/group:other
+ok   「其他」排在所有已知组之后（视觉流末尾）  [["other","其他"],["other","Ivory 主题"],["other","第三方测试项"]]
+ok   原有宿主项一个没打乱  7 vs 7
+FAIL 移除未知项后「其他」组标题消失（不留孤儿）
+     group:personal/group:coding/group:integrations/group:other
+ok   移除后宿主项数回到原状  6 vs 6
+ok   宿主项在 DOM 里没被我们动过（仍是列表的直接子节点、仍是 button）  ["BUTTON","BUTTON","BUTTON","BUTTON","BUTTON","BUTTON"]
+
+── 8 暗色主题 ──
+FAIL 暗色下 4 个分组标题仍在且顺序不变
+     got  = ["个人","集成","编码","其他"]
+     want = ["个人","集成","编码","已归档"]
+ok   暗色下返回按钮与搜索框仍在  back=true search=1
+FAIL 暗色下视觉流与映射表一致
+     got  = [["personal","个人"],["personal","通用设置"],["integrations","集成"],["integrations","内置插件"],["integrations","订阅服务"
+],["coding","编码"],["coding","模型"],["coding","Agent 预设"],["other","其他"],["other","Ivory 主题"]]
+     want = [["personal","个人"],["personal","通用设置"],["personal","宠物"],["personal","使用统计"],["integrations","集成"],["integr
+ations","内置插件"],["integrations","Web 插件"],["integrations","订阅服务"],["integrations","记忆系统"],["integrations","创意工坊"],["cod
+ing","编码"],["coding","模型"],["coding","Agent 预设"],["coding","LLM Verifier"],["archive","已归档"],["archive","已归档会话"]]
+ok   暗色下注入节点仍有样式命中（不是透明无字）  {"back":"rgb(180, 180, 180)","group":"rgb(148, 148, 148)"}
+ok   暗色下被隐藏项依然不可见  []
+ok   暗色下行标题仍是 label-primary/14px，说明仍是 caption/12px（不随主题塌陷）  {"primary":"rgb(255, 255, 255)","caption":"rgb(148, 148, 148)","title0":{"text":"权限","fs":"14px","color":"rgb(255, 255, 255)"},"desc0":{"text":"选择新会话的默认权限","fs":"12px","color":"rgb(148, 148, 148)"}}
+ok   暗色下页头仍在、文本仍跟随激活项、仍是唯一  {"present":true,"headCount":1,"titleCount":1,"text":"通用设置","fontSize":"20px","fontWeight":"600","display":"block","parentIsDirectChildOfContent":true,"parentHasActionSeat":true,"firstInRow":true,"rowIsFlex":true,"headClass":"cx-sm-pagehead","titleClass":"cx-sm-title","tag":"DIV"}
+ok   暗色下背板仍与主界面侧栏同色  左栏计算色=rgb(15, 15, 15) / --dsw-alias-bg-sidebar=#0f0f0f
+ok   暗色下背板同样不透明：无 backdrop-filter，且底色 alpha = 1  filter=none / 背板=rgb(15, 15, 15)
+ok   暗色下内容列 = bg-base（令牌相对；与侧栏分层是上游 0.5.6 起的现实）  内容列=rgb(17, 17, 17) / bg-base=#111111 / 侧栏=rgb(15, 15, 15)
+ok   暗色下分组卡仍是浮起的一层（卡色 ≠ 整页面色）  卡=rgb(33, 33, 33) / 面=rgb(15, 15, 15)
+ok   暗色卡边仍是 border-l1 白色发丝（未被浅色侧栏色边污染）  暗色卡边=rgb(255, 255, 255) / border-l1=rgb(255, 255, 255) / 侧栏=rgb(15, 15, 15)
+ok   暗色下 ✕ 仍隐藏  display=none
+
+── 9 返回按钮行为 ──
+ok   能找到返回按钮  {"x":52,"y":26}
+ok   点返回按钮 → 设置模态关闭  panel count=0
+ok   关闭后不留注入孤儿  orphans=0
+
+── 9a Escape 被拦截时的兜底 ──
+ok   拦截态下仍能找到返回按钮  {"x":52,"y":26}
+FAIL Escape 被拦截时返回按钮仍能关掉设置（兜底路径活着）
+     panel count=1
+
+── 10 console ──
+ok   console 零报错（已剔除 3 类宿主既有噪音）
+ok   注入层没有打出 [codex-ui] 警告（结构自检全部通过）
+
+FAIL：10 项未通过（共 94 项，通过 84）
+截图目录：<codex-ui 主检出>\codex-ui\docs\recon

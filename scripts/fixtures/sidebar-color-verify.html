@@ -803,7 +803,9 @@
    配色不动：条目只用 --dsw-* 语义令牌（--dsw-alias-label-tertiary、--dsw-alias-interactive-bg-hover、
    --dsw-alias-border-l4 …），本皮肤已重锚这些令牌，因此跟着现在的配色走，不需要另配一套色。
    出口恒为 div[data-slot=槽名][style=display:contents]，不需要也不应该改出口本身。
-   ⚠ 本部注释里不能出现花括号（src/build.mjs 的 scopeCss 按花括号配对）。 */html[data-codex-ui] [data-slot="conversation.session.header"] > [data-conversation-tabs]{
+   ⚠ 本部注释里不能出现花括号（src/build.mjs 的 scopeCss 按花括号配对）。
+   T06 起这条受「出口就绪」门控：body[data-codex-ui-te-ready] 由 trajectory-exit.js
+   只在能可靠找回对话页签时盖上，认不出就保持可见。 */html[data-codex-ui] body[data-codex-ui-te-ready] [data-slot="conversation.session.header"] > [data-conversation-tabs]{
   display: none;
 }
 
@@ -816,7 +818,8 @@
    （data-conversation-header-leading，见 dsh-client-ui-conversation/lib/client.js:16223）。
    必须再带 :has([data-conversation-tabs])：hero/空白态下 showTabs=false，页签根本不渲染，
    官方 .wSkVaW_headerBlank 给的 min-height:0 与 padding-bottom:0 才是对的；
-   不带这个条件会反过来给空白顶栏塞 10px 下内边距（实测踩到过）。 */html[data-codex-ui] header:has([data-conversation-header-leading]):has([data-conversation-tabs]){
+   不带这个条件会反过来给空白顶栏塞 10px 下内边距（实测踩到过）。
+   同样受 T06 的出口就绪门控。 */html[data-codex-ui] body[data-codex-ui-te-ready] header:has([data-conversation-header-leading]):has([data-conversation-tabs]){
   min-height: 0;
   padding-bottom: 10px;
 }

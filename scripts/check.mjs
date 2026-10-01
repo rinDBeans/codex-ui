@@ -14,6 +14,7 @@ import vm from 'node:vm';
 import { execFileSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import { build, ROOT, SCOPE, SKIN_DIR, stripComments } from './build.mjs';
+import { openHost } from './lib/host.mjs';
 import { checklist, summarize } from './lib/checks.mjs';
 import * as override from '../src/client/override.js';
 import * as picker from '../src/client/model-picker/view.js';
@@ -225,6 +226,80 @@ attempt('设置卡没把 children 传成 jsx 的第三个参数（那里是 key�
   const card = read('src', 'client', 'settings-card.js');
   assert(!/jsxs\('[a-z]+', \{[^}]*\}, \[/.test(card) && !/jsxs\('[a-z]+', \{ className: '[^']*', key \}, \[/.test(card), '第三个参数是数组');
 });
+
+/* ── 6b. 设置卡草稿生命周期（UX-02 回归护栏）──────────────────────────────
+   shown = draftOf(field) ?? 权威值 ?? 默认值 —— 草稿是第一优先级。只写存储不清草稿，
+   就会出现「保存值已重置、滑杆/读数仍显示旧值」。本轮把两条提交路径（滑杆 commit、
+   重置 clear）都改成「先撤草稿、再动权威值」，这里把它们钉住，防止回归。 */
+attempt('设置卡：草稿与权威值同收（UX-02 回归护栏）', () => {
+  const card = read('src', 'client', 'settings-card.js');
+  assert(/const shown = draftOf\(field\) \?\? /.test(card), 'shown 的取值优先级变了（草稿优先是这条修复的前提）');
+  assert(/const clear = useCallback\(\(field\) => \{[\s\S]*?delete next\[field\][\s\S]*?scope\.unset\(field\)/.test(card),
+    'clear() 没有先撤草稿 —— 重置后滑杆/读数仍会显示旧草稿');
+  assert(/const commit = \(\) => \{[\s\S]*?delete copy\[field\][\s\S]*?write\(field, next\)/.test(card),
+    '对比度滑杆的 commit() 没有撤草稿 —— 提交后 shown 永远取草稿，保存值/重置都改不动读数');
+  return 'shown 草稿优先；clear() 与滑杆 commit() 都先撤草稿再动权威值';
+});
+
+/* ── 6c. 主题事务超时回退（UX-12 回归护栏）───────────────────────────────
+   写入被接受、但宿主一直没发 theme/change 时，预览会按真值回滚。此时分段控件必须
+   跟着回退，否则页面已回亮色、分段仍选深色（已复现的脱节）。这条链路靠
+   previewTheme 的结束回调打通，这里钉住它。 */
+attempt('设置卡：主题事务超时回退（UX-12 回归护栏）', () => {
+  const prev = read('src', 'client', 'theme-preview.js');
+  assert(/return \(target, onSettle\)/.test(prev), 'previewTheme 没有接收「预览结束」回调');
+  assert(/onSettle\(true\)/.test(prev) && /onSettle\(false\)/.test(prev),
+    'previewTheme 没有在「宿主已确认」与「超时回滚」两条路径上都通知调用方');
+  const card = read('src', 'client', 'settings-card.js');
+  assert(/previewTheme\(id, \(confirmed\) => \{[\s\S]*?setPendingTheme\(null\)/.test(card),
+    '主题切换没有在预览结束（超时/回滚）时清 pendingTheme —— 分段控件会停在未生效的那一档');
+  assert(card.includes('themeTimedOut'), '主题超时没有用户可见的反馈状态');
+  return 'previewTheme 结束回调 → 清 pending + 反馈';
+});
+
+/* ── 6d. 字段级错误与无障碍关联（UX-16 回归护栏）─────────────────────────
+   非法输入原本直接 return，用户「不清楚为何没保存」；说明与错误也没挂到控件上，
+   读屏只念 aria-label。这里钉住：错误要可见、要经 aria-describedby 关联、重置按钮要带字段名。 */
+attempt('设置卡：字段级错误与无障碍关联（UX-16 回归护栏）', () => {
+  const card = read('src', 'client', 'settings-card.js');
+  assert(card.includes('aria-describedby'), '控件没有 aria-describedby —— 说明与错误挂不到控件上');
+  assert(/const describedBy = error === undefined \? descId : descId \+ ' ' \+ errId/.test(card),
+    '没有「说明 + 错误」的关联链');
+  assert(/validate\(text\) === false\) \{[\s\S]*?setErrors/.test(card),
+    '非法输入又变回静默丢弃 —— 用户看不到为什么不保存');
+  assert(/copy\.resetOf\(label\)/.test(card), '重置按钮没有带字段名（多个「重置」同名，读屏分不清点的是哪个）');
+  assert((card.match(/resetOf: \(name\) => /g) ?? []).length === 2, 'resetOf 必须中英各一份');
+  return '说明/错误经 aria-describedby 关联；重置按钮含字段名';
+});
+
+/* ── 6e. 设置模态框自有文案的语言（UX-07 回归护栏）────────────────────────
+   实测：ctx.reflect.get('locale') 拿得到 LocaleRuntime，直接访问 ctx.locale 会 THREW
+   （它不在 inject 里）；且载入瞬间快照还是 zh，要等设置文档到达才解析成 en ——
+   所以文案必须**每次重放都重写**，只写一次会永远停在中文。 */
+attempt('设置模态框：自有文案中英成对且随 locale 刷新（UX-07 回归护栏）', () => {
+  const src = read('src', 'client', 'settings-modal.js');
+  assert(/ctx\.reflect\.get\('locale'\)/.test(src), 'locale 没经 ctx.reflect.get 取 —— 直接访问 ctx.locale 会 THREW');
+  assert(/const TEXT = \{[\s\S]*?zh: \{[\s\S]*?en: \{/.test(src), 'TEXT 表不是中英成对');
+  assert(/relabel\(list, back, search\)/.test(src), '重放时没有重写文案 —— 切语言后会停在旧语言');
+  assert(/const setText = |const setAttrIf = /.test(src), '重写文案没有「值不同才写」的守卫（会自触发观察器循环）');
+  assert(src.includes('GROUP_LABEL_EN'), '组标题没有英文名');
+  return 'locale 经 reflect 取；文案中英成对；每次重放重写且有收敛守卫';
+});
+
+/* ── 6f. 分组按 slot id，不依赖界面语言（UX-07 Step B 回归护栏）────────────
+   宿主把「通用设置」在英文下渲染成 "General"，按标签分组必然塌成「其他」（实测复现过）。
+   slot id（general / models / plugins …）与语言无关 —— 宿主自己也用
+   ctx.slots.entries('settings.section') 的 options.order 排序渲染，所以能与 navList 的
+   button 一一对齐。这里钉住这条链路与它的两道守卫。 */
+attempt('设置模态框：分组按 slot id，不依赖界面语言（UX-07 Step B）', () => {
+  const src = read('src', 'client', 'settings-modal.js');
+  assert(src.includes('GROUP_IDS') && src.includes('GROUP_OF_ID'), '没有 slot id → 组的映射表');
+  assert(/ctx\.slots\.entries\('settings\.section'\)/.test(src), '没有读宿主的 settings.section 条目');
+  assert(/const useIds = ids\.length === cells\.length/.test(src), '缺「条数对得上才用 id」的守卫（错位会分错组）');
+  assert(/const groupOf = \(label, slotId\)/.test(src), '没有 id 优先 / 标签兜底的归类函数');
+  assert(/const headerText = groupLabelOf\(group\)/.test(src), '标题比较键与写入值不同源（会与 relabel 互相触发振荡）');
+  return 'id 优先 · 标签兜底 · 条数守卫 · 标题单源';
+});
 attempt('宿主半与覆盖层的默认对比度一致', () => {
   const host = read('index.js');
   const light = Number(/DEFAULT_CONTRAST_LIGHT = (\d+)/.exec(host)?.[1]);
@@ -243,8 +318,45 @@ attempt('功率轨几何：对齐、比例与像素公式互逆', () => {
     const px = picker.ratioOffset(picker.indexRatio(i, 4), width);
     assert(picker.snapIndex(picker.offsetRatio(px + 100, 100, width), 4) === i, '第 ' + i + ' 档的像素位置反推不回来');
   }
-  assert(picker.ratioOffset(0, width) === picker.THUMB_SIZE / 2 && picker.ratioOffset(1, width) === width - picker.THUMB_SIZE / 2, '拇指行程不是 [14, 宽 − 14]');
-  return '4 档 · 行程 [14, ' + (width - 14) + ']';
+  assert(picker.ratioOffset(0, width) === picker.THUMB_SIZE / 2 && picker.ratioOffset(1, width) === width - picker.THUMB_SIZE / 2,
+    '拇指行程不是 [THUMB_SIZE/2, 宽 − THUMB_SIZE/2]（当前 THUMB_SIZE=' + picker.THUMB_SIZE + '）');
+  return '4 档 · 行程 [' + picker.THUMB_SIZE / 2 + ', ' + (width - picker.THUMB_SIZE / 2) + ']';
+});
+
+/* ── 7b. 保留组件基线冻结（T05）───────────────────────────────────────────
+   模型选择器与推理强度胶囊是用户明确认可、本轮及后续都不得改造的组件。
+   把它们的关键几何钉在 check 里：后续任何改造顺手改了这些值，CI 立刻红，
+   而不是等真 GUI 截图才发现。只钉数值，不约束实现方式。 */
+attempt('保留组件基线：模型选择器几何被冻结（T05）', () => {
+  assert(picker.THUMB_SIZE === 16,
+    'THUMB_SIZE 被改成 ' + picker.THUMB_SIZE + '：用户认可的是 16，不得为迎合官方 28px 圆旋钮而改');
+  const mp = stripComments(read('skins', 'codex-ink', 'model-picker.css'));
+  assert(/\.codex-mp-track\s*\{[^}]*height:\s*30px/.test(mp), '轨道热区高不是 30px —— 保留组件的几何被改动');
+  assert(/\.codex-mp-track::before\s*\{[^}]*height:\s*26px[^}]*border-radius:\s*8px/.test(mp),
+    '轨道槽不是 26px / 圆角 8px —— 保留组件的几何被改动');
+  assert(mp.includes('width: calc(8px + (100% - 16px) * var(--codex-mp-pos, 0));'),
+    '填充宽公式不是 THUMB_SIZE/2 那条 —— 保留组件的几何被改动');
+  assert(mp.includes('.codex-mp-matrix-sq'), '顶档点阵被移除（用户明确要求保留）');
+  const comp = read('src', 'client', 'model-picker', 'component.js');
+  assert(comp.includes("tick.style.left = 'calc(' + THUMB_SIZE / 2 + 'px + (100% - ' + THUMB_SIZE + 'px) * '"),
+    '档位点位的像素公式与 THUMB_SIZE 脱钩');
+  return 'THUMB_SIZE=16 · 轨热区 30px · 槽 26px/圆角 8px · 填充 8px+(100%−16px)×pos · 顶档点阵在';
+});
+
+/* ── 7c. 导航降级安全（T06 / UX-08 回归护栏）─────────────────────────────
+   页签条的隐去必须受「出口就绪」门控：只有 trajectory-exit.js 确认能找回对话页签
+   时才盖 body[data-codex-ui-te-ready]。否则一旦模块认不出页签（未知语言 / DOM 漂移 /
+   压根没装上），用户进了轨迹就出不来。这里钉住这个不变量。 */
+attempt('导航降级安全：页签隐去受出口门控（T06 / UX-08）', () => {
+  const patches = stripComments(read('skins', 'codex-ink', 'patches.css'));
+  const ungated = patches.split('\n')
+    .filter((l) => l.includes('[data-conversation-tabs]') && !l.includes('data-codex-ui-te-ready'));
+  assert(ungated.length === 0, '存在不受门控的页签规则（出口不可用时用户会无路可退）：' + ungated.slice(0, 2).join(' | '));
+  const te = read('src', 'client', 'trajectory-exit.js');
+  assert(te.includes('TE_READY_ATTR'), 'trajectory-exit.js 没有用出口就绪标记');
+  assert(/setReady\(target !== null\)/.test(te), 'trajectory-exit.js 没有按「能否找回对话页签」开关就绪标记');
+  assert(te.includes('setReady(false)'), 'trajectory-exit.js 的清理路径没撤就绪标记（卸载后会留下被隐藏的页签）');
+  return '页签隐去挂在 body[data-codex-ui-te-ready] 下，认不出页签即保持可见';
 });
 attempt('功率轨视图：pending 乐观显示、selecting 不重画列表、分组同宿主排序', () => {
   const groups = [
@@ -546,6 +658,207 @@ attempt('彩色白名单：patches.css 不引入 skin.css 调色板之外的彩�
   return '调色板 ' + palette.size + ' 色；patches.css 引用 ' + used.length + ' 色';
 });
 
+/* ── 8b. T08 文本与弹层（UX-13 / UX-14）回归护栏 ─────────────────────────
+   三条都是「防止有人把刚修掉的问题改回来」：全局 a 重新被染成 accent、UI 标签重新被强制等宽、
+   正文链接的作用域被删掉。判据与 scripts/specs/text.mjs 的 TX-01/02/04 对齐。 */
+const patchesCss = stripComments(read('skins', 'codex-ink', 'patches.css'));
+
+attempt('链接：全局 a 不得被强制染 accent（UX-13 / TX-01）', () => {
+  /* 顶层裸选择器 `a { ... }` 里的 color 只能是 inherit / currentColor —— 出现 --dsw-alias-link 即为回归。 */
+  const bareA = patchesCss.match(/^a\s*\{([^}]*)\}/m);
+  assert(bareA !== null, '找不到顶层 a 规则（② 链接）');
+  const color = (bareA[1].match(/(?:^|;)\s*color\s*:\s*([^;]+)/) ?? [])[1] ?? '';
+  assert(!/var\(--dsw-alias-link\)/.test(color), '顶层 a 又被染成 alias-link：' + color.trim());
+  assert(/inherit|currentColor/.test(color), '顶层 a 的 color 应为 inherit/currentColor，实为：' + color.trim());
+  return color.trim();
+});
+
+attempt('链接：正文语境必须有自己的作用域规则（UX-13 / TX-02）', () => {
+  const scoped = [...patchesCss.matchAll(/\[data-dsh-part="(?:prose|article)"\]\s+a/g)];
+  assert(scoped.length >= 2, '正文链接作用域规则不足（prose/article 各一条）：' + scoped.length + ' 处');
+  const block0 = patchesCss.slice(patchesCss.indexOf('[data-dsh-part="prose"] a'), patchesCss.indexOf('[data-dsh-part="prose"] a') + 400);
+  assert(/var\(--dsw-alias-link\)/.test(block0), '正文作用域里没有 alias-link（TX-02 反了）');
+  return scoped.length + ' 处';
+});
+
+attempt('元信息：UI 标签不得被强制等宽（UX-14 / TX-04）', () => {
+  /* 上一版把 tag-chip / tag-badge / composer-chip 一起塞进 font-family: var(--dsw-font-meta)。
+     现在只有 chip / ref 是等宽的；三个 UI 标签出现即回归。 */
+  const offenders = ['tag-chip', 'tag-badge', 'composer-chip'].filter((part) => {
+    const re = new RegExp('[^\\n]*\\[data-dsh-part="' + part + '"\\][^\\n]*', 'g');
+    return [...patchesCss.matchAll(re)].some((m) => /font-family\s*:\s*var\(--dsw-font-meta\)/.test(m[0]));
+  });
+  assert(offenders.length === 0, '又被强制等宽：' + offenders.join(', '));
+  const kept = ['chip', 'ref'].filter((part) => new RegExp('font-family\\s*:\\s*var\\(--dsw-font-meta\\)').test(patchesCss));
+  assert(kept.length > 0, '连真 chip 的等宽也没了');
+  return '等宽保留：' + kept.join('/') + '；UI 标签不强制';
+});
+
+/* ── 8c. T14 漂移与能力检测（并入现有设施，不建第二条宿主解析路径）────
+   按方案 §8 的 T14：关键锚点缺失就**明确失败**，未知包只作信息。
+   宿主来源仍走 scripts/lib/host.mjs 的 openHost()（DSH_ASAR / DSH_GLOBAL_MODULES / 扫描三选一，
+   显式给了不存在的路径直接报错）—— 不新建 scripts/audit-host.mjs。
+   宿主读不到时（CI 无宿主、路径没配）整节 SKIP，不 FAIL：漂移检测是加分项，不能变成 CI 红线。 */
+attempt('T14 宿主锚点：皮肤依赖的契约仍存在', () => {
+  let host;
+  try {
+    host = openHost();
+  } catch (e) {
+    return 'SKIP 宿主不可读（' + String(e.message).split('\n')[0].slice(0, 80) + '）';
+  }
+  /* 皮肤真正依赖的宿主锚点。每一项都能在皮肤源码里找到对应选择器 —— 不是凭印象列的。
+     缺任何一项都意味着皮肤会静默失效（样式不命中），按 T14 判 FAIL。 */
+  /* 包名是**实测**出来的，不是照着名字推的：
+       data-sidebar-right-panel 在 dsh-client-ui-sidebar-right（不是 -layout）
+       settings.section 由各 dsh-client-ui-settings-* 子页注册（不是 -settings）
+       data-side 在 dsh-client-ui-conversation（侧栏/右栏两条分界柄）
+     第一版把 layout / settings 当成归属，T14 立刻报"漂移"——那是本表写错，不是宿主变了。 */
+  const ANCHORS = [
+    ['@deepseek-ai/dsh-client-ui-conversation/lib/client.js', ['data-composer-card', 'data-conversation-scroll', 'data-conversation-tabs', 'data-lexical-editor', 'data-side']],
+    /* 会话流容器在 -chat 包（-conversation 里没有），另有更精确的 data-chat-flow-kind（user/steering/…）。 */
+    ['@deepseek-ai/dsh-client-ui-chat/lib/client.js', ['data-chat-flow', 'data-chat-flow-kind']],
+    ['@deepseek-ai/dsh-client-ui-sidebar-right/lib/client.js', ['data-sidebar-right-panel', 'data-sidebar-right-guide', 'data-sidebar-right-toggle']],
+    ['@deepseek-ai/dsh-client-ui-settings-general/lib/client.js', ['settings.section']],
+    ['@deepseek-ai/dsh-client-ui-model-selection/lib/client.js', ['conversation.input.model']],
+    ['@deepseek-ai/dsh-client-ui-tool/lib/client.js', ['data-tool', 'data-state', 'data-variant', 'data-chat-call-id']],
+    ['@deepseek-ai/dsh-client-ui-input-trigger/lib/client.js', ['data-trigger-menu']],
+    ['@deepseek-ai/dsh-client-ui-approval/lib/client.js', ['data-approval-key']],
+    ['@deepseek-ai/dsh-client-ui-user-questions/lib/client.js', ['data-question-key']],
+  ];
+  const missing = [];
+  const info = [];
+  let scanned = 0;
+  for (const [pkg, attrs] of ANCHORS) {
+    let srcText = null;
+    try { srcText = host.read(pkg); } catch { srcText = null; }
+    if (srcText === null) { info.push(pkg.replace('@deepseek-ai/', '')); continue; }
+    scanned += 1;
+    for (const a of attrs) {
+      if (!srcText.includes(a)) missing.push(pkg.replace('@deepseek-ai/', '') + ' → ' + a);
+    }
+  }
+  assert(missing.length === 0, '宿主已漂移，皮肤会静默失效：' + missing.join('；'));
+  return '已扫 ' + scanned + '/' + ANCHORS.length + ' 个包'
+    + (info.length > 0 ? '；本机没有这些包（只作信息）：' + info.join(', ') : '');
+});
+
+/* ── 8d. T07 高频内容（⑲ content.css）回归护栏 ──────────────────────────
+   三条防回退：① 状态词表必须与宿主类型声明对齐（漏一档就有一类内容没样式）；
+   ② 不得引用不存在的令牌（写成 --dsw-font-code 会被浏览器丢弃整条声明、静默回落 UI 字体，
+      实测代码块就是这样丢掉了等宽）；③ 失败态必须真的可识别（有状态条 + 有徽标），不能只剩红字。 */
+const contentCss = stripComments(read('skins', 'codex-ink', 'content.css'));
+const skinCssRaw = read('skins', 'codex-ink', 'skin.css');
+
+attempt('内容：状态词表与宿主 ToolRowState 对齐（T07）', () => {
+  /* 权威判据 = dsh-client-ui-tool/lib/types/tool-call-model.d.ts 的 ToolRowState 联合。
+     宿主读不到时（CI 无宿主）只校验皮肤侧五档齐全，不判 FAIL。 */
+  const REQUIRED = ['preparing', 'running', 'ok', 'error', 'stopped'];
+  const missing = REQUIRED.filter((s) => !contentCss.includes('data-state="' + s + '"'));
+  assert(missing.length === 0, '皮肤没覆盖这些状态：' + missing.join(', '));
+  let host = null;
+  try { host = openHost(); } catch { return '皮肤侧五档齐全（宿主不可读，未做双向对账）'; }
+  /* 路径里有 client/tool/models/ 三层 —— 第一版写成 lib/types/tool-call-model.d.ts，
+     host.read() 返回 null，护栏静默降级成"未找到"、双向对账根本没跑。
+     降级不能掩盖路径写错，所以这里直接 assert 而不是 return。 */
+  const dts = host.read('@deepseek-ai/dsh-client-ui-tool/lib/types/client/tool/models/tool-call-model.d.ts');
+  assert(dts !== null, '读不到宿主的 tool-call-model.d.ts —— 路径又变了，护栏会静默失效');
+  /* 只取 ToolRowState 那一行的字面量，别把 variant 联合也吸进来。 */
+  const line = (dts.match(/type\s+ToolRowState\s*=\s*([^;]+);/) ?? [])[1];
+  assert(line !== undefined, '宿主的 tool-call-model.d.ts 里没有 ToolRowState 联合类型');
+  const hostStates = new Set([...line.matchAll(/'([a-z]+)'/g)].map((m) => m[1]));
+  const extra = REQUIRED.filter((s) => !hostStates.has(s));
+  assert(extra.length === 0, '皮肤覆盖了宿主没有的状态：' + extra.join(', '));
+  const uncovered = [...hostStates].filter((s) => !REQUIRED.includes(s));
+  assert(uncovered.length === 0, '宿主有这些状态但皮肤没覆盖：' + uncovered.join(', '));
+    return '皮肤五档 ⊆ 宿主 ToolRowState（宿主共 ' + hostStates.size + ' 个字面量）';
+});
+
+attempt('内容：不得引用 skin.css 里不存在的令牌（T07）', () => {
+  /* 教训：content.css 第一版写 var(--dsw-font-code)，skin.css 里没有这个令牌，
+     浏览器丢弃整条声明、代码块静默回落 UI 字体，verify 直接测出来。 */
+  const declared = new Set([...skinCssRaw.matchAll(/(--dsw-[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+  const used = new Set([...contentCss.matchAll(/var\((--dsw-[a-z0-9-]+)\)/g)].map((m) => m[1]));
+  /* 宿主令牌（--dsh-*）与宿主自带的（--ds-*）不在 skin.css 里声明，不参与对账。 */
+  const unknown = [...used].filter((t) => !declared.has(t) && !t.startsWith('--dsh-') && !t.startsWith('--ds-'));
+  assert(unknown.length === 0, '引用了 skin.css 未声明的令牌：' + unknown.join(', '));
+  return used.size + ' 个令牌全部有定义';
+});
+
+attempt('内容：失败态可识别（状态条 + 徽标，不是只有红字）（T07）', () => {
+  assert(/\[data-tool\]\[data-state="error"\][\s\S]{0,400}?box-shadow/.test(contentCss),
+    '失败态没有状态条 —— 与成功态同色就等于没有状态');
+  assert(/\[data-tool\]\[data-state="stopped"\]/.test(contentCss),
+    '停止态没单独处理（被取消与出错不能长得一样）');
+  assert(/data-tone="error"/.test(contentCss), '没有 data-tone 的映射');
+  return 'error 红条 / stopped 中性条 / ok 无条';
+});
+
+/* ── 8e. T07 等待态与状态点护栏 ──────────────────────────────────────────
+   一条真实的坑：data-state 这个属性名在宿主里有**两套互不相同的词表**——
+     · ToolRow 的 data-state   = preparing | running | ok | error | stopped
+     · StateDot 的 data-state  = done | warning | ongoing | error | idle
+   实测同屏出现过 STATES = ["idle","ok","running","warning"]，就是两套混在一起。
+   如果 ⑲ 里写一条裸的 [data-state="error"]，就会把状态点也涂成行文字色。
+   下面这条断言把「所有 [data-state] 选择器都必须带宿主锚点前缀」钉死。 */
+attempt('内容：不得用裸的 [data-state] 选择器（两套词表同名，会误伤 StateDot）', () => {
+  const bare = [...contentCss.matchAll(/^[^\n{}]*\[data-state=/gm)]
+    .map((m) => m[0].trim())
+    /* 允许的属性锚点前缀：工具行（tool/sample）、回合（turn-process）、审批与提问卡。 */
+    .filter((line) => !/\[data-(tool|sample|turn-process|approval-key|question-key)/.test(line));
+  assert(bare.length === 0, '这些 [data-state] 规则没带宿主锚点前缀，会命中 StateDot：\n    ' + bare.join('\n    '));
+  return contentCss.split('\n').filter((l) => /\[data-state=/.test(l)).length + ' 条规则全部带锚点前缀';
+});
+
+attempt('内容：等待态三类必须齐全（审批 / 提问 / 目标）', () => {
+  for (const [anchor, why] of [
+    ['data-approval-key', '审批卡：球在用户手里，必须与"进行中"区分'],
+    ['data-question-key', '提问卡：同上'],
+    ['data-goal-bar', '目标条：常驻状态条'],
+    ['data-command-input', '命令输入：随目标条出现'],
+  ]) {
+    assert(contentCss.includes(anchor), '缺 ' + anchor + ' —— ' + why);
+  }
+  return '审批 / 提问 / 目标 / 命令输入 四类锚点均已处理';
+});
+
+/* ── 8f. 锚点归属护栏：宿主锚点 vs skin-center 适配器锚点 ────────────────
+   实测结论（扫 83 个宿主 client.js）：**data-dsh-part 出现 0 次**。
+   也就是说宿主自己从不打 data-dsh-part —— 那个键是 skin-center 适配器补的。
+   后果：只写 [data-dsh-part="xxx"] 的规则，在**纯宿主**组合下永不命中；
+   而 codex-ui 的日常组合恰好是"宿主 + 第三方主题"，有没有适配器不确定。
+   所以凡是皮肤真正依赖的锚点，必须同时有一条**宿主真有的**锚点可选。
+   下面这条把已经查清归属的几个写死，防止后来者继续凭名字猜。 */
+attempt('锚点归属：data-dsh-part 宿主不打，真锚点必须另有一条', () => {
+  let host = null;
+  try { host = openHost(); } catch { return 'SKIP 宿主不可读'; }
+  /* 抽查三个已确认归属的：宿主真有的锚点。 */
+  const PROVEN = [
+    ['@deepseek-ai/dsh-client-ui-conversation/lib/client.js', ['data-composer-chip', 'data-conversation-scroll']],
+    ['@deepseek-ai/dsh-client-ui-input-trigger/lib/client.js', ['data-trigger-menu', 'data-source', 'data-overflow-below']],
+    ['@deepseek-ai/dsh-client-ui-approval/lib/client.js', ['data-approval-key']],
+    ['@deepseek-ai/dsh-client-ui-user-questions/lib/client.js', ['data-question-key', 'data-question-reply']],
+    ['@deepseek-ai/dsh-client-ui-tool/lib/client.js', ['data-tool', 'data-state', 'data-variant']],
+  ];
+  const bad = [];
+  for (const [pkg, attrs] of PROVEN) {
+    const text = host.read(pkg);
+    if (text === null) continue;
+    for (const a of attrs) if (!text.includes(a)) bad.push(pkg.replace('@deepseek-ai/', '') + ' → ' + a);
+  }
+  assert(bad.length === 0, '这些宿主锚点查不到了：' + bad.join('；'));
+
+  /* 反向：content.css 里凡是只靠 data-dsh-part 的组件，必须另有宿主锚点。 */
+  const all = read('skins', 'codex-ink', 'content.css');
+  const NEED_PARTNER = [
+    { part: 'composer-chip', partner: '[data-composer-chip]', why: '宿主 createDOM 写的是 el.setAttribute("data-composer-chip", source)' },
+  ];
+  const orphans = NEED_PARTNER.filter(({ partner }) => !all.includes(partner));
+  assert(orphans.length === 0,
+    '这些组件只剩 data-dsh-part 一条路（纯宿主下永不命中）：'
+    + orphans.map((o) => o.part + ' 缺 ' + o.partner).join('；'));
+  return '5 个包的真锚点均在；composer-chip 有宿主锚点兜底';
+});
+
 /* ── 9. 文档成对 ──────────────────────────────────────────────────────── */
 attempt('双语文档成对', () => {
   for (const f of ['README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'skins/codex-ink/README.md', 'skins/codex-ink/README.zh-CN.md']) {
@@ -555,7 +868,7 @@ attempt('双语文档成对', () => {
 
 /* ── 10. 文本编码 ─────────────────────────────────────────────────────── */
 attempt('文本为无 BOM 的 UTF-8', () => {
-  const files = [...jsFiles, ...listFiles(ROOT, ['.md', '.css', '.json', '.yml'])];
+  const files = [...jsFiles, ...listFiles(ROOT, ['.md', '.css', '.json', '.yml', '.log'])];
   for (const file of files) {
     const buf = fs.readFileSync(file);
     assert(!(buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf), '带 UTF-8 BOM：' + rel(file));
@@ -569,7 +882,7 @@ attempt('文本为无 BOM 的 UTF-8', () => {
    而 client.js 里是 JSON 转义过的 —— 分隔符可能是一个或两个反斜杠。 */
 attempt('源码、样式与文档无机器专属绝对路径', () => {
   const bad = /(?:[A-Za-z]:(?:\\{1,2}|\/)(?:Users|A-part-of-new-software|npm-global|codex-ref|codex-src-tmp|PROJIECT)\b)|(?:\/home\/[^\s'"]+\/)|(?:\/Users\/[^\s'"/]+\/)/g;
-  const files = [...jsFiles, ...listFiles(ROOT, ['.css', '.md'])];
+  const files = [...jsFiles, ...listFiles(ROOT, ['.css', '.md', '.log', '.json'])];
   const hits = files.flatMap((file) => [...fs.readFileSync(file, 'utf8').matchAll(bad)].map((m) => rel(file) + ' → ' + m[0]));
   assert(hits.length === 0, hits.join('；'));
   return files.length + ' 个文件';

@@ -1,0 +1,22 @@
+IDLE  {"centerShadow":"rgba(11, 11, 11, 0.1) 0px 0px 0px 0.5px, rgba(13, 13, 13, 0.07) 0px 0px 13px 0px","dark":false,"centerRadius":"16px","sidebarBorder":"1px rgba(11, 11, 11, 0.1)","panelShadow":"none","handleLeft":{"opacity":"1","width":"auto","grad":false},"handleRight":null}
+PANEL {"centerShadow":"rgba(11, 11, 11, 0.1) 0px 0px 0px 0.5px, rgba(13, 13, 13, 0.07) 0px 0px 13px 0px","dark":false,"centerRadius":"16px","sidebarBorder":"1px rgba(11, 11, 11, 0.1)","panelShadow":"rgba(11, 11, 11, 0.1) 0px 0px 0px 0.5px, rgba(13, 13, 13, 0.05) 0px -12px 24px -12px","handleLeft":{"opacity":"1","width":"auto","grad":false},"handleRight":{"opacity":"0","width":"2px","grad":true}}
+B-FACE {"seat":{"x":560,"y":458,"h":28,"hostHidden":true},"open":{"w":254,"rows":117,"ticks":[8,61,114,167,220],"now":0,"thumb":8}}
+B-FACE 改档 {"before":"deepseek-v4.1-flash · Default","after":"deepseek-v4.1-flash · Low","mine":"deepseek-v4.1-flash · Low","rows":117} 复原 deepseek-v4.1-flash · Off
+PASS 中列 0.5px 发丝线 + 13px 环境影（亮）   [rgba(11, 11, 11, 0.1) 0px 0px 0px 0.5px, rgba(13, 13, 13, 0.07) 0px 0px 13px 0px dark=false]
+PASS 中列圆角 16px   [16px]
+FAIL 侧栏无右边框   [1px rgba(11, 11, 11, 0.1)]
+PASS 左分界线无悬停渐变   [{"opacity":"1","width":"auto","grad":false}]
+PASS 右栏面板左沿发丝线   [rgba(11, 11, 11, 0.1) 0px 0px 0px 0.5px, rgba(13, 13, 13, 0.05) 0px -12px 24px -12px]
+PASS 右栏面板影只往上泄（负 spread）   [rgba(11, 11, 11, 0.1) 0px 0px 0px 0.5px, rgba(13, 13, 13, 0.05) 0px -12px 24px -12px]
+PASS 右分界线带渐变   [{"opacity":"0","width":"2px","grad":true}]
+PASS B 面：自建触发器在席、宿主那一格隐藏   [{"x":560,"y":458,"h":28,"hostHidden":true}]
+PASS B 面：弹层 254px、有模型行   [{"w":254,"rows":117,"ticks":[8,61,114,167,220],"now":0,"thumb":8}]
+PASS B 面：档位等距、首档在 8px   [[8,61,114,167,220]]
+PASS B 面：拇指落在生效档上   [8 vs 8]
+PASS B 面：键盘改档写进宿主的 store（宿主自己的触发器标题跟着变）   [{"before":"deepseek-v4.1-flash · Default","after":"deepseek-v4.1-flash · Low","mine":"deepseek-v4.1-flash · Low","rows":117}]
+PASS B 面：改档往返中列表不清空   [117 / 117]
+FAIL B 面：改回原档（探针不留现场）   [deepseek-v4.1-flash · Off / deepseek-v4.1-flash · Default]
+模型位：B 面自建选择器
+截图 <TEMP>\codex-ui-shots\live-gui.png
+
+FAILED (12/14)

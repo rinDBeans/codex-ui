@@ -1,0 +1,132 @@
+<!doctype html><html data-codex-ui><head><meta charset="utf-8"><title>text-overlay-verify</title>
+<!--
+  text-overlay-verify — T08 文本与弹层统一（UX-13 / UX-14）的纯皮肤层夹具。
+
+  不仿真宿主 DOM、不写宿主类名的 hash 后缀、不依赖任何 host shipped 文件。
+  只摆出「皮肤契约要求宿主/适配器打的语义属性」，用来读本皮肤在计算样式上的承诺：
+
+    - 全局 <a> 默认不染色（TX-01）
+    - [data-dsh-part="prose"] a 染 alias-link + hover 下划线（TX-02）
+    - 导航/菜单/按钮里的 <a> 保持 UI 颜色（TX-03）
+    - tag-chip / tag-badge / composer-chip 不被强制 mono（TX-04）
+    - 中文豁免 chip 的 letter-spacing / uppercase（TX-05）
+    - code / kbd / 文件路径仍是 meta 等宽（TX-06）
+    - 用户 token 覆盖 alias-link 后链接色跟变（TX-07）
+
+  夹具结构对应 §7.1 验收矩阵的 A/B/C 段，由 scripts/specs/text.mjs 用 Chromium 读 computed style
+  逐条断言。改判据必须同时改 CHANGELOG 与 README 的表（与 sidebar-color 同样的纪律）。
+-->
+<style>
+  /* 局部夹具底色 + 字体：让「正文语境」看起来像一段 markdown 容器。 */
+  body {
+    margin: 0;
+    font: 14px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #ffffff;
+    color: #1a1c1f;
+  }
+  .stage { padding: 24px; display: grid; gap: 24px; grid-template-columns: 1fr 1fr; }
+  .panel { border: 0.5px solid rgba(13,13,13,0.12); border-radius: 12px; padding: 16px; background: #fafafa; }
+  .panel h2 { font-size: 13px; margin: 0 0 12px; color: #5d5d5d; font-weight: 600; }
+  .prose { line-height: 1.65; max-width: 640px; }
+  .chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #f1f1ef;
+    color: #5d5d5d;
+    font-size: 12px;
+    margin-right: 4px;
+  }
+  [data-tag-tone="1"] { background: var(--dsw-alias-state-success-tertiary); color: var(--dsw-alias-state-success-primary); }
+  [data-tag-tone="2"] { background: var(--dsw-alias-state-warn-tertiary); color: var(--dsw-alias-state-warn-primary); }
+  [data-tag-tone="3"] { background: var(--dsw-alias-state-error-tertiary); color: var(--dsw-alias-state-error-primary); }
+  [data-tag-tone="4"] { background: var(--dsw-alias-state-business-tertiary); color: var(--dsw-alias-label-primary); }
+  [data-tag-tone="5"] { background: #e5e5e5; color: #767676; }
+  nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; }
+  nav a { padding: 4px 8px; border-radius: 6px; color: #1a1c1f; }
+  nav a:hover { background: #f1f1ef; }
+  [role="menu"] { padding: 5px; border-radius: 14px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  [role="menu"] a, [role="menu"] button { display: block; width: 100%; text-align: left; padding: 6px 10px; border: 0; background: transparent; color: #1a1c1f; border-radius: 4px; font: inherit; }
+  [role="menu"] a:hover, [role="menu"] button:hover { background: #f1f1ef; }
+  .override-link-host { --dsw-alias-link: #ff0066; }
+  kbd { background: #f1f1ef; border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+  .bare a { color: inherit; text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="stage">
+
+    <section class="panel">
+      <h2>① 全局 &lt;a&gt; 默认不染色（TX-01）</h2>
+      <p>无 prose 上下文的裸链接，computed color 应等于父级前景（不是 alias-link）。</p>
+      <div class="bare">
+        <a href="#" id="a-bare">裸链接——和正文同色</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>② 正文语境链接染 alias-link（TX-02）</h2>
+      <div data-dsh-part="prose" class="prose">
+        <p>
+          正文段落里<a href="#" id="a-prose">外部文档链接</a>应取 <code>--dsw-alias-link</code>。
+          鼠标悬停 <a href="#" id="a-prose-hover">这条</a> 时应有下划线（动态验证）。
+        </p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>③ 导航 / 菜单 / 按钮内链接不被强染（TX-03）</h2>
+      <nav>
+        <ul>
+          <li><a href="#" id="a-nav">导航链接</a></li>
+          <li><a href="#" id="a-nav-2">另一个</a></li>
+        </ul>
+      </nav>
+      <div role="menu">
+        <a href="#" id="a-menu" role="menuitem">菜单项链接</a>
+        <button type="button" id="btn-menu" role="menuitem">菜单项按钮</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>④ chip / tag 不被强制 mono（TX-04）</h2>
+      <p>
+        <span data-dsh-part="tag-chip" class="chip" data-tag-tone="0" id="chip-0">状态 0</span>
+        <span data-dsh-part="tag-chip" class="chip" data-tag-tone="1" id="chip-1">成功</span>
+        <span data-dsh-part="tag-chip" class="chip" data-tag-tone="2" id="chip-2">警告</span>
+        <span data-dsh-part="tag-chip" class="chip" data-tag-tone="3" id="chip-3">错误</span>
+        <span data-dsh-part="tag-chip" class="chip" data-tag-tone="4" id="chip-4">业务</span>
+        <span data-dsh-part="tag-chip" class="chip" data-tag-tone="5" id="chip-5">静默</span>
+      </p>
+      <p>
+        <span data-dsh-part="tag-badge" class="chip" data-tag-tone="2" id="badge-2">Badge Warn</span>
+        <span data-dsh-part="composer-chip" class="chip" id="composer-chip">Composer Chip</span>
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2>⑤ 中文豁免（TX-05）</h2>
+      <div lang="zh">
+        <span data-dsh-part="composer-chip" class="chip" id="composer-chip-zh">中文标签</span>
+        <span data-dsh-part="tag-chip" class="chip" id="chip-zh">中文状态</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>⑥ code / kbd / 路径保留等宽（TX-06）</h2>
+      <p>
+        等宽 <code id="code-inline">const sum = (a, b) => a + b</code> 与
+        <kbd id="kbd-1">⌘</kbd>+<kbd id="kbd-2">K</kbd> 一起出现。
+        文件路径 <code id="code-path">src/client/trajectory-exit.js</code>。
+      </p>
+    </section>
+
+    <section class="panel override-link-host">
+      <h2>⑦ 用户覆盖 alias-link（TX-07）</h2>
+      <div data-dsh-part="prose" class="prose">
+        <p>覆盖后的<a href="#" id="a-overridden">链接色</a>应跟随本地 token，不应被锁死。</p>
+      </div>
+    </section>
+
+  </div>
+</body></html>

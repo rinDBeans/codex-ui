@@ -1,0 +1,84 @@
+/* codex-ink · L3 组件契约（追加）· ⑱ 浮层：菜单与溢出
+   ----------------------------------------------------------------------------
+   T08「文本与弹层统一」的范围：菜单 / tooltip / toast / 长内容 overflow 局部化。
+   本文件只写**宿主已有契约锚点**的那一部分，逐条说明取证来源：
+
+     · [data-menu-material]      宿主菜单材质层，声明 --dsw-menu-backdrop-filter: blur(40px) saturate(150%)
+                                与 --dsw-elevation-stroke（body[data-ds-dark-theme] 下换 l3 描边色）。
+                                皮肤要把这两项压到墨白灰阶的不透明层，否则菜单在亮色下泛蓝、滚动时透出底。
+     · [data-trigger-menu]       建议 / 触发菜单（MenuSurface）。带 data-overflow-below 时表示下方还有溢出项
+                                —— 这是「长菜单裁切」的唯一可判信号，用它决定要不要给滚动条留边距。
+     · body > div[role="menu"][aria-busy]   宿主模型菜单（patches.css ⑫ 已画，保留它不动）。
+
+   **没有写的部分，以及为什么**（宿主提案，不是漏做）：
+     · tooltip —— 全宿主仅 1 处 role="tooltip"，且**没有** data-tooltip / data-dsh-part 之类的专属锚点。
+       凭 role 写样式会连命中无障碍语义容器与实时区（role=status/alert 各 52/66 处），污染面不可控。
+     · toast  —— 全宿主**零** data-toast / data-tooltip 属性；toast 若存在是复用 role=status/role=alert。
+       同样无稳定锚点。
+     结论：这两项按 plan §7.2「没有接口的工作形成宿主提案，不做假按钮占位」留在 T00 §5.3，
+     不在这里造一个宿主永不打的属性。待宿主补锚点或本插件提供显式 data-dsh-part 契约后再补。
+
+   共享样式的边界：不碰两个保留组件（模型选择器 / 推理强度胶囊）——
+   本文件不出现 [data-slot="conversation.input.model"]、不出现 .wSkVaW_* 类名后缀。
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* ⑱·1 菜单材质：压成不透明的墨白灰阶层。
+   宿主 rc.1 的填充在 [data-menu-material] 自身（--dsw-menu-backdrop-filter），rc.2 在外层 MenuSurface
+   的 material 子层 —— 两层都压，否则滚动时底下会透出。亮度由 --dsw-alias-bg-layer-1 决定，
+   不写死色值：用户换 accent / surface 档位时菜单跟着走。 */
+html[data-codex-ui] [data-menu-material] {
+  --dsw-menu-backdrop-filter: none;
+  --dsw-menu-surface-fill: var(--dsw-alias-bg-layer-1);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 暗色下描边提到 l3（宿主原本就是这么做的，但层级被本皮肤的 l1 覆盖了，这里补回来）。 */
+html[data-codex-ui] body[data-ds-dark-theme] [data-menu-material] {
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+}
+
+/* ⑱·2 菜单内长列表：溢出局部化到菜单自身。
+   max-height 由宿主通过 inline style 给（MenuSurface 的 maxHeight props），这里不覆盖它 ——
+   覆盖会把宿主的「按视口剩余空间定高」逻辑作废，菜单会顶出屏幕。
+   只补三件事：① 可滚动；② 滚动条细一点，不喧宾夺主；③ 首尾不裁切。 */
+html[data-codex-ui] [data-trigger-menu],
+html[data-codex-ui] [data-menu-material] {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 首尾各留 1px：部分浏览器会把 inline 阴影/描边裁在 overflow 边界上。 */
+  scroll-padding-block: 1px;
+}
+
+html[data-codex-ui] [data-trigger-menu]::-webkit-scrollbar,
+html[data-codex-ui] [data-menu-material]::-webkit-scrollbar {
+  width: 8px;
+}
+
+html[data-codex-ui] [data-trigger-menu]::-webkit-scrollbar-thumb,
+html[data-codex-ui] [data-menu-material]::-webkit-scrollbar-thumb {
+  background: var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+html[data-codex-ui] [data-trigger-menu]::-webkit-scrollbar-thumb:hover,
+html[data-codex-ui] [data-menu-material]::-webkit-scrollbar-thumb:hover {
+  background: var(--dsw-alias-border-l4);
+  background-clip: content-box;
+}
+
+/* ⑱·3 长菜单：data-overflow-below 存在即表示下面还有内容，给列表一个可滚动的视觉暗示。
+   这里只改 padding，不改 max-height（那是宿主的 inline style）。 */
+html[data-codex-ui] [data-trigger-menu][data-overflow-below] {
+  padding-bottom: 5px;
+}
+
+/* ⑱·4 菜单项里的多行文本：路径 / 命令 / 长标题要能换行并省略，不能把菜单撑破。 */
+html[data-codex-ui] [data-trigger-menu] [role="menuitem"],
+html[data-codex-ui] [data-trigger-menu] [role="option"] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

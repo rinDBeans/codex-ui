@@ -39,13 +39,18 @@ export function installThemePreview(ctx) {
     if (preview === null) return;
     clearTimeout(timer);
     timer = 0;
+    const { onSettle } = preview;
     preview = null;
     root.removeAttribute(PREVIEW_ATTR);
-    if (confirmed) return;
+    if (confirmed) {
+      try { if (onSettle !== null) onSettle(true); } catch { /* 回调不许连累流程 */ }
+      return;
+    }
     try {
       const active = activeScheme();
       if (active !== null) applyScheme(active);
     } catch { /* 读不到服务就保持现状 */ }
+    try { if (onSettle !== null) onSettle(false); } catch { /* 回调不许连累回滚 */ }
   };
 
   ctx.effect(() => ctx.on('theme/change', (snapshot) => {
@@ -54,10 +59,15 @@ export function installThemePreview(ctx) {
   }), 'codex-ui: theme change');
   ctx.effect(() => () => endPreview(false), 'codex-ui: theme preview cleanup');
 
-  return (target) => {
+  /**
+   * @param target - 'light' | 'dark' | 'system'。
+   * @param onSettle - 预览结束时的回调：true = 宿主发布了同一结果；false = 超时/卸载按真值回滚。
+   *   分段控件靠它清 pending —— 没有这个回调，超时后页面回亮色、控件还停在深色（已复现的脱节）。
+   */
+  return (target, onSettle) => {
     if (target !== 'light' && target !== 'dark' && target !== 'system') return;
     const scheme = schemeOf(target);
-    preview = { scheme };
+    preview = { scheme, onSettle: typeof onSettle === 'function' ? onSettle : null };
     root.setAttribute(PREVIEW_ATTR, scheme);
     suppressTransitions();
     applyScheme(scheme);

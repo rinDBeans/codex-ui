@@ -15,3 +15,7 @@ export const SWITCH_ATTR = 'data-codex-ui-switching';
 
 /** 主题本地预览期间打上（值为预览的那一套）。 */
 export const PREVIEW_ATTR = 'data-codex-ui-preview';
+
+/** 轨迹出口「就绪」标记：只在能可靠找回对话页签时才打在 <body> 上。
+ *  patches.css 的页签隐去规则挂在它下面 —— 认不出页签就不盖，页签保持可见。 */
+export const TE_READY_ATTR = 'data-codex-ui-te-ready';

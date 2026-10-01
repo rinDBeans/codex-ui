@@ -1,0 +1,328 @@
+/* codex-ink · L3 组件契约（追加）· ⑲ 高频内容组件（T07）
+   ----------------------------------------------------------------------------
+   范围：工具卡 / 推理行 / 回合摘要与详情 / 等待 / 失败 / 取消。
+   **判据来源**（改之前逐条实测，不凭印象）：
+
+     ① 类型声明（dsh-client-ui-tool/lib/types/tool-call-model.d.ts）—— 完整状态词表：
+          ToolRowState = 'preparing' | 'running' | 'ok' | 'error' | 'stopped'
+          variant      = 'search' | 'read' | 'bash' | 'write' | 'edit' | 'code' | 'others'
+     ② 渲染代码（dsh-client-ui-tool/lib/client.js）—— 锚点落点：
+          ToolRow.root            { data-variant, data-tool, data-state }
+          bash_sample.root        { data-sample="bash", data-variant="bash", data-state,
+                                    data-expandable, role=button, tabIndex }
+          ask_user_question 行     { data-variant="others", data-tool="ask_user_question", data-state }
+          ToolDetails.badge        { data-tone }
+     ③ 真实 GUI 实测（scripts/live/content.mjs，本轮跑的会话）：
+          data-tool 4 · data-state 10 · data-chat-call-id 6 · data-subcalls 2
+          data-expandable 9 · data-variant 9 · data-chat-flow 3
+          实际出现 STATES   = ["error", "idle", "ok"]
+          实际出现 VARIANTS = ["bash", "code", "read", "search", "think"]
+        —— 注意 VARIANTS 里的 "think" 不在类型声明的 variant 联合里：推理行由
+           dsh-client-ui-chat 的 data-variant 承担，是**另一个**包���属性同名。
+           所以本文件对 variant 分两组处理：工具行的七档 + 推理行。
+
+   边界：
+     · 不碰两个保留组件（模型选择器 / 推理强度胶囊）——本文件不出现 conversation.input.model。
+     · 不覆盖宿主的 max-height / 展开逻辑（data-expandable + role=button 是宿主行为，只做视觉）。
+     · 不引入 host 调色板之外的彩色（check.mjs 的彩色白名单会拦）。
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* ⑲·1 状态语义：把"状态"收敛成三个可一眼分辨的档。
+   判据：五态里 preparing/running/stopped 都是**过程**（用户不需要区分这三者），
+   ok 是**完成**，error 是**失败**。所以配色分三组而不是五组：
+     过程（含停止）→ 中性次要色 + 光标 progress
+     完成          → 继承前景，不加色（Codex 的 chrome 无彩色，成功不需要庆祝色）
+     失败          → 状态红，且**必须有**可读的错误文本容器
+   只用状态三色（success/warn/error）与灰阶，不给"进行中"上蓝色 —— 蓝是交互色不是状态色。 */
+html[data-codex-ui] [data-tool][data-state="preparing"],
+html[data-codex-ui] [data-tool][data-state="running"],
+html[data-codex-ui] [data-tool][data-state="stopped"],
+html[data-codex-ui] [data-sample][data-state="preparing"],
+html[data-codex-ui] [data-sample][data-state="running"],
+html[data-codex-ui] [data-sample][data-state="stopped"] {
+  color: var(--dsw-alias-label-secondary);
+  cursor: progress;
+}
+
+html[data-codex-ui] [data-tool][data-state="ok"],
+html[data-codex-ui] [data-sample][data-state="ok"] {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 失败行：文字保持主前景（整段红字太吵），靠**左侧状态条**区分。
+   这是"状态易识别"与"不要一片红"之间的折中；上一版让 error 与 ok 同色，
+   实测判据直接判它不合格（两者长得一样就等于没状态）。 */
+html[data-codex-ui] [data-tool][data-state="error"],
+html[data-codex-ui] [data-sample][data-state="error"] {
+  color: var(--dsw-alias-label-primary);
+  box-shadow: inset 2px 0 0 0 var(--dsw-alias-state-error-primary);
+  padding-left: calc(var(--dsw-space-3) + 2px);
+}
+
+/* 停止态（stopped）也归到"没成功"那一侧：给一条中性的状态条，与失败的红条同形不同色，
+   免得"被取消"和"出错了"在视觉上完全一样。 */
+html[data-codex-ui] [data-tool][data-state="stopped"],
+html[data-codex-ui] [data-sample][data-state="stopped"] {
+  box-shadow: inset 2px 0 0 0 var(--dsw-alias-border-l3);
+  padding-left: calc(var(--dsw-space-3) + 2px);
+}
+
+/* 失败态的状态点/徽标才吃红色 —— 行本身保持前景色，否则整段红字太吵。
+   data-tone 是 ToolDetails.badge 的 tone（宿主给值），失败/警告两档对上状态色。 */
+html[data-codex-ui] [data-tool][data-state="error"] [data-tone="error"],
+html[data-codex-ui] [data-sample][data-state="error"] [data-tone="error"],
+html[data-codex-ui] [data-tone="error"] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+html[data-codex-ui] [data-tone="warn"] {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+html[data-codex-ui] [data-tone="success"] {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+/* ⑲·2 工具行的次要文字：工具名、耗时、路径这类"元信息"用辅助色 + UI 字体。
+   不再等宽 —— 见 patches.css ⑤ 的同一条纪律（等宽只留给代码/路径/快捷键本身）。 */
+html[data-codex-ui] [data-tool] [data-caption],
+html[data-codex-ui] [data-tool] [data-change] {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dsw-meta-size);
+}
+
+/* ⑲·3 可展开的工具卡：摘要行恒定高度，不许因内容长短跳动。
+   role=button + tabIndex 是宿主给的键盘可达性，本层只加视觉与过渡。 */
+html[data-codex-ui] [data-tool][data-expandable],
+html[data-codex-ui] [data-sample][data-expandable] {
+  cursor: pointer;
+  border-radius: var(--dsw-radius-s);
+  transition: background-color var(--dsw-motion-fast) var(--dsw-ease);
+}
+
+html[data-codex-ui] [data-tool][data-expandable]:hover,
+html[data-codex-ui] [data-sample][data-expandable]:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* 展开态给一个极轻的底，区分"收起一行摘要"与"展开一整块详情"。 */
+html[data-codex-ui] [data-tool][data-expandable][aria-expanded="true"],
+html[data-codex-ui] [data-sample][data-expandable][aria-expanded="true"] {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+/* ⑲·4 输出正文：代码/命令/JSON 保持等宽并允许横向滚动，不折行。
+   判据：命令与 JSON 折行后无法逐字比对；Markdown 正文由宿主 renderer 负责排版，不在此干预。 */
+html[data-codex-ui] [data-tool] pre,
+html[data-codex-ui] [data-sample] pre,
+html[data-codex-ui] [data-turn-process-body] pre,
+html[data-codex-ui] [data-turn-process-messages] pre {
+  /* --dsw-font-code **不存在**（skin.css 只有 --dsw-font-meta = var(--ds-font-family-code)）；
+     写成不存在的令牌会被浏览器丢弃整条声明，代码块静默回落 UI 字体。实测过，别改回去。 */
+  font-family: var(--dsw-font-meta);
+  overflow-x: auto;
+  max-width: 100%;
+  white-space: pre;
+}
+
+/* ⑲·5 回合摘要与详情（dsh-client-ui-chat 的 data-turn-process-*）。
+   摘要行是频繁扫读的对象，详情块是低频对象 —— 层级必须一眼可分：
+   摘要用次要色，详情用主前景 + 更小字号。 */
+html[data-codex-ui] [data-turn-process] {
+  color: var(--dsw-alias-label-primary);
+}
+
+html[data-codex-ui] [data-turn-process-chevron] {
+  color: var(--dsw-alias-label-tertiary);
+  transition: transform var(--dsw-motion-fast) var(--dsw-ease);
+}
+
+html[data-codex-ui] [data-turn-process-messages],
+html[data-codex-ui] [data-turn-process-tool-calls] {
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsw-meta-size);
+}
+
+/* 回答正文是用户真正要读的东西：主前景 + 正文字号，不缩成 meta。
+   摘要行可以被扫过，答案不能。 */
+html[data-codex-ui] [data-turn-process-answer] {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 详情默认收起由宿主控制（data-expanded / data-collapsed-summary）；
+   本层只保证收起时不留空白块。 */
+html[data-codex-ui] [data-turn-process][data-expanded="false"] [data-turn-process-body] {
+  display: none;
+}
+
+/* ⑲·6 失败 / 不可用：宿主用 data-error 与 data-unavailable 标记，
+   这两处必须"有话可说" —— 失败原因写在行内，不允许只剩一个红点。
+   data-unavailable 是"这条内容拿不到"（与 error 不同：不是出错，是没有）。 */
+html[data-codex-ui] [data-error],
+html[data-codex-ui] [data-unavailable] {
+  color: var(--dsw-alias-state-error-primary);
+  font-size: var(--dsw-meta-size);
+}
+
+html[data-codex-ui] [data-unavailable] {
+  color: var(--dsw-alias-label-tertiary);
+  font-style: normal;
+}
+
+/* ⑲·7 推理行（data-variant="think"，由 dsh-client-ui-chat 承担，与工具行同名不同包）。
+   过程态的思考文本用次要色，不用等宽、不大写、不拉字距。 */
+html[data-codex-ui] [data-variant="think"] {
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsw-meta-size);
+}
+
+/* ⑲·7b 等待用户操作的三类：审批 / 用户提问 / 计划评审
+   ── 判据来源（read: 锚点）──────────────────────────────────────────────────
+   dsh-client-ui-approval/lib/client.js：
+     ApprovalPanel.root { data-approval-key, aria-busy: answered, onKeyDown }
+     keydown：Enter → "allowed-once"，Esc → "rejected"（中文输入法合成中不触发）
+     <StateDot state={answered ? "ongoing" : "warning"} /> + t("waiting")
+   dsh-client-ui-user-questions/lib/client.js：
+     QuestionComposer.frame { data-question-key }
+     .card / .cardMinimized 两态；[data-question-reply] 是答复输入；[data-reply-outcome] 是答复结果
+     PlanReviewPanel.strip { <StateDot state={busy ? "ongoing" : "warning"} /> }
+   ────────────────────────────────────────────────────────────────────────────
+   三者的共同点是**会话被用户挡住**了：这不是"进程还在跑"，是"球在你手里"。
+   视觉上必须与"进行中"区分开 —— 进行中会自己走完，等待不会。
+   所以：等待态用**警告色状态点**（宿主 StateDot 已经给了）+ 卡片描边提示"这里要你动手"。 */
+
+html[data-codex-ui] [data-approval-key],
+html[data-codex-ui] [data-question-key] {
+  border-radius: var(--dsw-radius-m);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 等待态：描边用中性档，不用警告色 —— 警告色留给 StateDot，
+   整圈描边变黄会变成"出错了"。 */
+html[data-codex-ui] [data-approval-key][aria-busy="false"],
+html[data-codex-ui] [data-question-key] {
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-1);
+  padding: var(--dsw-space-4);
+}
+
+/* 已答复（aria-busy 随 answered 翻转）：收敛成一条普通记录，
+   不再占一整块等你的注意力。 */
+html[data-codex-ui] [data-approval-key][aria-busy="true"] {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsw-meta-size);
+}
+
+/* 提问卡的答复输入区：可编辑区要明确"能打字"。
+   只加最小框 —— QuestionComposer 自己的 .card 已经画了大部分。 */
+html[data-codex-ui] [data-question-reply],
+html[data-codex-ui] [data-question-key] [contenteditable="true"],
+html[data-codex-ui] [data-question-key] textarea {
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsw-font-family);
+  caret-color: var(--dsw-alias-label-primary);
+}
+
+/* 答复结果（[data-reply-outcome]）：是"你答了什么"的回执，低频扫读。 */
+html[data-codex-ui] [data-reply-outcome] {
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsw-meta-size);
+}
+
+/* 问题正文滚动区：长问题要能在卡内滚，不能把整张卡撑到屏外。 */
+html[data-codex-ui] [data-question-scroll],
+html[data-codex-ui] [data-approval-scroll] {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  max-height: 40vh;
+}
+
+/* ⑲·7c 目标条与命令输入（dsh-client-ui-goal：data-goal-bar / data-command-input）
+   目标条是常驻状态条，不能因为折叠/展开改变高度 —— 否则输入区会上下跳。 */
+html[data-codex-ui] [data-goal-bar] {
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsw-meta-size);
+  padding: var(--dsw-space-2) 0;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+html[data-codex-ui] [data-command-input] {
+  font-family: var(--dsw-font-family);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ⑲·7d 引用与建议菜单（dsh-client-ui-input-trigger）
+   ── 判据来源（read: 锚点）──────────────────────────────────────────────────
+   触发语法（lib/client.js 的 activeAtToken）：
+     @path  或  @"path with spaces"；@ 在其他 token 内（邮箱）不算触发
+     { trigger: "@", query, quoted, position: "leading" | "inline", span }
+   菜单结构：
+     MenuSurface[data-trigger-menu][data-overflow-below]   ← 材质/溢出由 overlays.css ⑱ 接管
+       └ .viewport[role=listbox]
+           ├ .groupTitle[role=presentation][data-source]   ← **组标题**才带 data-source
+           └ [role=status]                                 ← pending 组的占位
+   ⚠️ 第一版写的是 [data-dsh-part="ref"] —— 宿主**从不打** data-dsh-part
+      （扫 83 个 client.js 命中 0；那个键是 skin-center 适配器补的）。
+      真实锚点是组标题上的 [data-source]。
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* 组标题（"文件 / 技能 / 斜杠命令"这类分区）：次要色 + 小字号。
+   它是结构件不是内容，不该抢条目的视觉权重。 */
+html[data-codex-ui] [data-trigger-menu] [data-source] {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dsw-meta-size);
+  font-family: var(--dsw-font-family);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* pending 组（[role=status]）：内容还在加载，必须有话可说，不能是个空标题。 */
+html[data-codex-ui] [data-trigger-menu] [role="status"] {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dsw-meta-size);
+}
+
+/* ⑲·7e composer chip（dsh-client-ui-conversation 的 createDOM）：
+     el.setAttribute("data-composer-chip", this.__source)
+     el.setAttribute("contenteditable", "false")
+   ⚠️ 属性**有值**（source 名），不是空串。patches.css 用的是
+      [data-dsh-part="composer-chip"] —— 那是适配器键，宿主不打；
+      真实宿主里必须靠 [data-composer-chip] 命中，两条都留着。
+   chip 是"已经插进输入框的引用"，是 UI 文本：UI 字体、不大写、不拉字距
+   （与 patches.css ⑤ 同一条纪律）。 */
+html[data-codex-ui] [data-composer-chip],
+html[data-codex-ui] [data-dsh-part="composer-chip"] {
+  font-family: var(--dsw-font-family);
+  font-size: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-2);
+  border-radius: var(--dsw-radius-s);
+  padding: 0 var(--dsw-space-2);
+  /* 不可编辑的装饰节点：不该有手型光标。 */
+  cursor: default;
+  user-select: all;
+}
+
+/* chip 里的文件名/路径本身仍用等宽 —— 逐字比对路径是引用存在的全部意义。
+   宿主把 chip 拆成 label + path 两层时用 [class$="_path"] 取；取不到就不强取。 */
+html[data-codex-ui] [data-composer-chip] [class$="_path"] {
+  font-family: var(--dsw-font-meta);
+}
+
+/* ⑲·8 reduced-motion：⑲·3 的 chevron 旋转与背景过渡都要能被关掉。
+   宿主靠 transitionend 摘 data-animating，所以用 0.01ms 而不是 none（与 patches.css ⑪ 同理）。 */
+@media (prefers-reduced-motion: reduce) {
+  html[data-codex-ui] [data-turn-process-chevron] {
+    transition-duration: 0.01ms;
+  }
+
+  html[data-codex-ui] [data-tool][data-expandable],
+  html[data-codex-ui] [data-sample][data-expandable] {
+    transition-duration: 0.01ms;
+  }
+}

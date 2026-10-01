@@ -24,6 +24,8 @@ export const SCOPE = 'html[data-codex-ui]';
 export const SKIN_PARTS = [
   'skin.css', // L1 令牌 + L2 排版
   'patches.css', // L3 通用组件契约、宿主模型菜单、输入区顶栏、右栏
+  'overlays.css', // L3 浮层：菜单材质与长列表溢出（T08）
+  'content.css', // L3 高频内容：工具卡 / 回合摘要详情 / 状态三档（T07）
   'model-picker.css', // L3 模型选择器组件
   'sidebar-align.css', // L3 侧栏对齐
   'sidebar-surface.css', // L3 侧栏滚动渐隐
