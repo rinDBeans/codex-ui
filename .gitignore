@@ -6,3 +6,9 @@ scripts/host.local.json
 # 临时探测/草稿脚本（仓库根）。check.mjs 的「语法 N 个 JS 文件」会扫到 ./*.mjs，
 # 留在这里会污染 CI；git add -A 也容易把它们顺手提交进去（已发生过一次）。
 /.*.mjs
+
+# 临时提交信息文件（git commit -F 的中间产物）。0.7.2 又被 git add -A 顺手带进去过一次，
+# 同一次还把移出仓库的 bundle 记成了重命名，导致「移除」没真正生效。
+/.*.txt
+!LICENSE
+/docs/*.bak
