@@ -308,6 +308,31 @@ attempt('宿主半与覆盖层的默认对比度一致', () => {
   return light + ' / ' + dark;
 });
 
+/* ── 6g. 侧栏对齐不留祖先 :has()（T09 / 64f4d60 的性能债）─────────────
+   实测依据：:has() 落在祖先位置、且目标是常见元素（span / *）时，会话区每插入一个带
+   data-slot 的节点，Chromium 都要把受影响祖先下的全部候选重新匹配一遍 —— 流式插入
+   实测整页样式重算 4.3s → 0.27s 就是靠去掉这几条。
+   侧栏三条（sidebar-align / sidebar-surface）已全部改写成固定深度子代 + 类名后缀；
+   这里钉住它，并顺带对账宿主是否真有那个类名后缀（否则改写会静默失效）。 */
+attempt('侧栏样式不留祖先 :has()（T09）', () => {
+  const offenders = [];
+  for (const f of ['sidebar-align.css', 'sidebar-surface.css']) {
+    const css = stripComments(read('skins', 'codex-ink', f));
+    if (css.includes(':has(')) offenders.push(f + ' → ' + (css.match(/:has\([^)]*\)/g) ?? []).join(' '));
+  }
+  assert(offenders.length === 0, '侧栏又出现 :has()（会拖慢流式插入时的样式重算）：' + offenders.join('；'));
+  /* 锚点对账：新写法靠宿主 CSS 模块的类名后缀，宿主改哈希前缀不影响后缀。 */
+  const align = stripComments(read('skins', 'codex-ink', 'sidebar-align.css'));
+  assert(!align.includes(':has(> svg)'), '新会话对齐修正又退回 :has(> svg)');
+  let host = null;
+  try { host = openHost(); } catch { return '0 条 :has()（宿主不可读，未做类名对账）'; }
+  const sidebar = host.read('@deepseek-ai/dsh-client-ui-sidebar/lib/client.js');
+  if (sidebar === null) return '0 条 :has()（本机无 dsh-client-ui-sidebar，只作信息）';
+  assert(/_collapsed/.test(sidebar), '宿主侧栏已没有 _collapsed 类 —— 侧栏根锚点会静默失效');
+  assert(/_newSessionContent/.test(sidebar) && /_newSessionContent\{[^}]*100cqw/.test(sidebar),
+    '宿主侧栏已没有 _newSessionContent 或它不再带 width:100cqw —— 对齐修正会打空');
+  return '0 条 :has() · _collapsed 与 _newSessionContent 均在宿主中' ;
+});
 /* ── 7. 模型选择器（纯函数 + 样式纪律）─────────────────────────────────── */
 attempt('功率轨几何：对齐、比例与像素公式互逆', () => {
   assert(picker.snapIndex(0, 4) === 0 && picker.snapIndex(1, 4) === 3 && picker.snapIndex(0.49, 4) === 1 && picker.snapIndex(0.51, 4) === 2, 'snapIndex 取整错');

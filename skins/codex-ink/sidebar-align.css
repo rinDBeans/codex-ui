@@ -51,8 +51,12 @@
   text-overflow: ellipsis;
 }
 
-/* rc.2 在按钮里多套了两层（labelMask > content，content 写死 width:100cqw + 居中），拉回左对齐 */
-[data-slot="sidebar"] > div:not([class*="_collapsed"]) > button > span > span:has(> svg) {
+/* rc.2 在按钮里多套了两层（labelMask > content，content 写死 width:100cqw + 居中），拉回左对齐。
+   锚点用宿主的 _newSessionContent 类名后缀（与 64f4d60 的 _collapsed 同款写法）：宿主 CSS 里
+   它就是 `width:100cqw; justify-content:center` 那一支，命中范围与原 :has(> svg) 完全一致。
+   实测 dsh-client-ui-sidebar 没有给这两层 span 打任何 data-* 属性，类名后缀是唯一可替代 :has()
+   的稳定标识（:has 落在祖先位置会拖慢流式插入时的样式重算，见 64f4d60）。 */
+[data-slot="sidebar"] > div:not([class*="_collapsed"]) > button > span > span[class*="_newSessionContent"] {
   justify-content: flex-start;
   width: auto;
 }

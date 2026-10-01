@@ -1663,7 +1663,7 @@ html[data-codex-ui] [data-slot="sidebar"] > div:not([class*="_collapsed"]) > but
   text-overflow: ellipsis;
 }
 
-html[data-codex-ui] [data-slot="sidebar"] > div:not([class*="_collapsed"]) > button > span > span:has(> svg) {
+html[data-codex-ui] [data-slot="sidebar"] > div:not([class*="_collapsed"]) > button > span > span[class*="_newSessionContent"] {
   justify-content: flex-start;
   width: auto;
 }
